@@ -14,6 +14,9 @@ const pool = new Pool({
   port: DB_PORT,
   password: DB_PASSWORD,
   database: DB_NAME,
+  ssl: {
+    rejectUnauthorized: false, // SSL 인증서 검증을 하지 않도록 설정
+  },
 });
 
 module.exports = pool;
