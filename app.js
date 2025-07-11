@@ -18,7 +18,7 @@ app.use(cookieParser());
  * router 등록
  */
 app.use("/main", mainRouter);
-app.use("/saveTestResult", saveTestResultRouter);
+app.use("/api/me/mbti", saveTestResultRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
