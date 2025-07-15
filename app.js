@@ -6,6 +6,7 @@ const logger = require("morgan");
 
 const mainRouter = require("./routes/mainRouter");
 const saveTestResultRouter = require("./routes/saveTestResultRouter");
+const etfFindRouter = require("./routes/etfFindRouter");
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use(cookieParser());
  */
 app.use("/main", mainRouter);
 app.use("/api/me/mbti", saveTestResultRouter);
+app.use("/api/etfs", etfFindRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
