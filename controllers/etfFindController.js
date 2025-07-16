@@ -31,7 +31,8 @@ const etfFindController = {
             asset_class: etf.asset_class,
             theme: etf.theme,
             expense_ratio: etf.expense_ratio,
-            returns: etf.returns,
+            // price: etf_price,
+            returnRates: etf.returnRates,
           }))
         )
       );
