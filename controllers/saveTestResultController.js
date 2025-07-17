@@ -4,15 +4,16 @@ const { saveTRService } = require("../services/saveTestResultService");
 
 const saveTestResultController = {
   saveTestResultPage: async (req, res) => {
-    const { userId, mbtiType } = req.body;
+    const { userId, mbtiType, riskScore } = req.body;
+    console.log(req.body);
 
     try {
-      const result = await saveTRService(userId, mbtiType);
-    //   console.log("User ID:", userId);
-    //   console.log("MBTI Type:", mbtiType);
+      const result = await saveTRService(userId, mbtiType, riskScore);
+      //   console.log("User ID:", userId);
+      //   console.log("MBTI Type:", mbtiType);
       res.json(
         successResponse(
-            //수정 api 라서 modify라고 뒀습니다, responseMessage 파일 안에 맞는 걸로 넣으면 됨
+          //수정 api 라서 modify라고 뒀습니다, responseMessage 파일 안에 맞는 걸로 넣으면 됨
           responseMessage.success.modify.status,
           responseMessage.success.modify.message,
           result
