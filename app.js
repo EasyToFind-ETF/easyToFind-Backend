@@ -8,6 +8,7 @@ const cors = require("cors");
 const mainRouter = require("./routes/mainRouter");
 const saveTestResultRouter = require("./routes/saveTestResultRouter");
 const etfFindRouter = require("./routes/etfFindRouter");
+const getTestResultRouter = require("./routes/getTestResult");
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use(
 app.use("/main", mainRouter);
 app.use("/api/me/mbti", saveTestResultRouter);
 app.use("/api/etfs", etfFindRouter);
+app.use("/api/recommendation", getTestResultRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
