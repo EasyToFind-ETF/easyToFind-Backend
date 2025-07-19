@@ -24,16 +24,7 @@ const etfFindController = {
         successResponse(
           responseMessage.success.read.status,
           responseMessage.success.read.message,
-          result.map((etf) => ({
-            etf_code: etf.etf_code,
-            etf_name: etf.etf_name,
-            provider: etf.provider,
-            asset_class: etf.asset_class,
-            theme: etf.theme,
-            expense_ratio: etf.expense_ratio,
-            // price: etf_price,
-            returnRates: etf.returnRates,
-          }))
+          result
         )
       );
     } catch (error) {
