@@ -2,10 +2,10 @@ const { saveTRDao } = require("../dao/saveTestResultDao");
 const pool = require("../common/database");
 
 const saveTestResultService = {
-  saveTRService: async (userId, mbtiType) => {
+  saveTRService: async (userId, mbtiType, riskScore) => {
     const client = await pool.connect();
     try {
-      const result = await saveTRDao(client, userId, mbtiType);
+      const result = await saveTRDao(client, userId, mbtiType, riskScore);
       if (result.rowCount === 0) {
         throw new Error("Failed to save test result");
       }
