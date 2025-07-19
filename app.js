@@ -22,6 +22,8 @@ const holdingFindRouter = require("./routes/holdingFindRouter");
 const getTestResultRouter = require("./routes/getTestResult");
 const getTestThemeRouter = require("./routes/getTestThemeRouter");
 const userRouter = require("./routes/userRouter");
+
+const goalPlannerRouter = require("./routes/goalPlannerRouter");
 const app = express();
 
 app.use(logger("dev"));
@@ -47,6 +49,7 @@ app.use("/api/holdings", holdingFindRouter);
 app.use("/api/recommendation", getTestResultRouter);
 app.use("/api/recommendation/theme", getTestThemeRouter);
 app.use("/api/auth", userRouter);
+app.use("/api/goal-planner", goalPlannerRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
