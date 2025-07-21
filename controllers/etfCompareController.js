@@ -28,7 +28,7 @@ const etfCompareController = {
         )
       );
     } catch (error) {
-      console.error("❌ ETF 단일 데이터 조회 실패:", error);
+      // console.error("❌ ETF 단일 데이터 조회 실패:", error);
       res
         .status(500)
         .json(

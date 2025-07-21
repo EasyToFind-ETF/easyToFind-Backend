@@ -23,9 +23,9 @@ const etfCompareRouter = require("./routes/etfCompareRouter");
 const getTestResultRouter = require("./routes/getTestResult");
 const getTestThemeRouter = require("./routes/getTestThemeRouter");
 const userRouter = require("./routes/userRouter");
-
 const etfDetailRouter = require("./routes/etfDetailRouter");
 const goalPlannerRouter = require("./routes/goalPlannerRouter");
+const etfFavoriteRouter = require("./routes/etfFavoriteRouter");
 const app = express();
 
 app.use(logger("dev"));
@@ -54,6 +54,7 @@ app.use("/api/recommendation/theme", getTestThemeRouter);
 app.use("/api/auth", userRouter);
 app.use("/api/goal-planner", goalPlannerRouter);
 app.use("/api/etfs", etfDetailRouter);
+app.use("/api/me", etfFavoriteRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
