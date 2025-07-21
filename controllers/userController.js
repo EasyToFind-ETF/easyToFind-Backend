@@ -37,12 +37,14 @@ const userController = {
       const token = createToken(user, tokenMaxAge);
 
       // ✅ 쿠키 먼저 설정
-      res.cookie("authToken", token, {
-        httpOnly: false,
-        secure: false,
-        sameSite: "Lax",
-        maxAge: tokenMaxAge * 1000,
-      });
+      res
+        .cookie("authToken", token, {
+          httpOnly: false,
+          secure: false,
+          sameSite: "Lax",
+          maxAge: tokenMaxAge * 1000,
+        })
+        .json({ token });
 
       // ✅ 그리고 바로 응답 (절대 next() 호출하거나 비동기 중간 끼지 말 것)
       res.status(200).json({
