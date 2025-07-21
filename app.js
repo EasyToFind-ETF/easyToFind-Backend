@@ -8,7 +8,7 @@ const sequelize = require("./config/database"); // Sequelize 인스턴스 import
 sequelize
   .sync() // 테이블 자동 생성 or 동기화
   .then(() => {
-    console.log("📦 Sequelize DB sync 완료");
+    // console.log("📦 Sequelize DB sync 완료");
   })
   .catch((err) => {
     console.error("❌ DB sync 실패:", err);
@@ -17,6 +17,13 @@ sequelize
 const mainRouter = require("./routes/mainRouter");
 const saveTestResultRouter = require("./routes/saveTestResultRouter");
 const etfFindRouter = require("./routes/etfFindRouter");
+const holdingFindRouter = require("./routes/holdingFindRouter");
+const etfCompareRouter = require("./routes/etfCompareRouter");
+
+const getTestResultRouter = require("./routes/getTestResult");
+const getTestThemeRouter = require("./routes/getTestThemeRouter");
+const userRouter = require("./routes/userRouter");
+
 const etfDetailRouter = require("./routes/etfDetailRouter");
 const goalPlannerRouter = require("./routes/goalPlannerRouter");
 const app = express();
@@ -40,6 +47,12 @@ app.use(
 app.use("/main", mainRouter);
 app.use("/api/me/mbti", saveTestResultRouter);
 app.use("/api/etfs", etfFindRouter);
+app.use("/api/holdings", holdingFindRouter);
+app.use("/api/etf/compare", etfCompareRouter);
+app.use("/api/recommendation", getTestResultRouter);
+app.use("/api/recommendation/theme", getTestThemeRouter);
+app.use("/api/auth", userRouter);
+app.use("/api/goal-planner", goalPlannerRouter);
 app.use("/api/etfs", etfDetailRouter);
 
 // catch 404 and forward to error handler
