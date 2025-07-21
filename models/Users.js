@@ -17,6 +17,10 @@ const User = sequelize.define(
         isEmail: true,
       },
     },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: true, // 선택사항으로 설정
+    },
     password: {
       type: DataTypes.STRING,
       allowNull: false,
