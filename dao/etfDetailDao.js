@@ -151,7 +151,7 @@ const getEtfRecommendationScoreDao = async (etfCode) => {
                 etf_code,
                 group_id,
                 detail,
-                score,
+                etf_score,
                 mdd,
                 volatility,
                 return_1y,

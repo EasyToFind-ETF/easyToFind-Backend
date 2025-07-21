@@ -17,12 +17,7 @@ sequelize
 const mainRouter = require("./routes/mainRouter");
 const saveTestResultRouter = require("./routes/saveTestResultRouter");
 const etfFindRouter = require("./routes/etfFindRouter");
-const holdingFindRouter = require("./routes/holdingFindRouter");
-
-const getTestResultRouter = require("./routes/getTestResult");
-const getTestThemeRouter = require("./routes/getTestThemeRouter");
-const userRouter = require("./routes/userRouter");
-
+const etfDetailRouter = require("./routes/etfDetailRouter");
 const goalPlannerRouter = require("./routes/goalPlannerRouter");
 const app = express();
 
@@ -45,11 +40,7 @@ app.use(
 app.use("/main", mainRouter);
 app.use("/api/me/mbti", saveTestResultRouter);
 app.use("/api/etfs", etfFindRouter);
-app.use("/api/holdings", holdingFindRouter);
-app.use("/api/recommendation", getTestResultRouter);
-app.use("/api/recommendation/theme", getTestThemeRouter);
-app.use("/api/auth", userRouter);
-app.use("/api/goal-planner", goalPlannerRouter);
+app.use("/api/etfs", etfDetailRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
