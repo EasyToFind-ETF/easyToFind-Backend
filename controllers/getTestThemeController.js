@@ -4,11 +4,17 @@ const { getTTRService } = require("../services/getTestThemeResultService");
 
 const getTestThemeResultController = {
   getTestThemeResultPage: async (req, res) => {
-    const { riskScore, theme } = req.body;
+    const { returnRate, liquidity, trackingError, aum, theme } = req.body;
     console.log("req", req.body);
 
     try {
-      const result = await getTTRService(riskScore, theme);
+      const result = await getTTRService(
+        returnRate,
+        liquidity,
+        trackingError,
+        aum,
+        theme
+      );
       res.json(
         successResponse(
           responseMessage.success.modify.status,
