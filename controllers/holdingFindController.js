@@ -6,6 +6,7 @@ const { getHoldingFindService } = require("../services/holdingFindService");
 const holdingFindController = {
   getHoldingFindPage: async (req, res) => {
     const { query, sort, assetClass, theme, isFavorite } = req.query;
+    const userId = req.user?.user_id; // 인증된 사용자 ID
 
     try {
       const result = await getHoldingFindService(
@@ -13,7 +14,8 @@ const holdingFindController = {
         sort,
         assetClass,
         theme,
-        isFavorite
+        isFavorite,
+        userId
       );
 
       res.json(
