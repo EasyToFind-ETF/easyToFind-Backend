@@ -34,6 +34,13 @@ const userService = {
       user_email: user.user_email,
     };
   },
+  getUserInfoById: async (userId) => {
+    const user = await userDao.getUserById(userId);
+    if (!user) {
+      throw new Error("해당 사용자를 찾을 수 없습니다.");
+    }
+    return user;
+  },
 };
 
 module.exports = userService;

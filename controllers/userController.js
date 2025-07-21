@@ -36,13 +36,19 @@ const userController = {
       const tokenMaxAge = 60 * 60 * 24 * 3;
       const token = createToken(user, tokenMaxAge);
 
+      // ✅ 쿠키 먼저 설정
       res.cookie("authToken", token, {
         httpOnly: false,
         secure: false,
+        sameSite: "Lax",
         maxAge: tokenMaxAge * 1000,
       });
 
-      res.status(200).json({ ...user, token });
+      // ✅ 그리고 바로 응답 (절대 next() 호출하거나 비동기 중간 끼지 말 것)
+      res.status(200).json({
+        user_id: user.user_id,
+        user_email: user.user_email,
+      });
     } catch (err) {
       next(err);
     }
@@ -50,10 +56,34 @@ const userController = {
 
   logout: (req, res) => {
     res.cookie("authToken", "", {
-      httpOnly: true,
+      httpOnly: false,
       expires: new Date(Date.now()),
     });
     res.status(204).send();
+  },
+  getMe: async (req, res) => {
+    try {
+      const userId = req.user.user_id; // ✅ authMiddleware에서 세팅된 user
+      const user = await userService.getUserInfoById(userId);
+
+      res.json(
+        successResponse(
+          responseMessage.success.read.status,
+          responseMessage.success.read.message,
+          user
+        )
+      );
+    } catch (error) {
+      console.error(error);
+      res
+        .status(500)
+        .json(
+          failResponse(
+            responseMessage.fail.read.status,
+            responseMessage.fail.read.message
+          )
+        );
+    }
   },
 };
 
