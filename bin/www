@@ -8,7 +8,7 @@ const app = require("../app");
 const debug = require("debug")("pda-mini-backend:server");
 const http = require("http");
 const { PORT } = require("../common/envConstants");
-
+require("dotenv").config();
 /**
  * Get port from environment and store in Express.
  */

@@ -21,6 +21,12 @@ const userDao = {
     const result = await db.query(query, [email]);
     return result.rows[0]; // null 가능성 있음
   },
+
+  getUserById: async (userId) => {
+    return await User.findByPk(userId, {
+      attributes: ["user_id", "user_email", "birth", "created_at"],
+    });
+  },
 };
 
 module.exports = userDao;

@@ -2,10 +2,16 @@ const { getTRDao } = require("../dao/getTestResultDao");
 const pool = require("../common/database");
 
 const getTestResultService = {
-  getTRService: async (riskScore) => {
+  getTRService: async (returnRate, liquidity, trackingError, aum) => {
     const client = await pool.connect();
     try {
-      const result = await getTRDao(client, riskScore);
+      const result = await getTRDao(
+        client,
+        returnRate,
+        liquidity,
+        trackingError,
+        aum
+      );
       if (result.length === 0) {
         throw new Error("No test results found");
       }

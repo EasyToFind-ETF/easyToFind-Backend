@@ -4,8 +4,9 @@ const { saveTRService } = require("../services/saveTestResultService");
 
 const saveTestResultController = {
   saveTestResultPage: async (req, res) => {
-    const { userId, mbtiType, riskScore } = req.body;
-    console.log(req.body);
+    const userId = req.user.user_id; // authMiddleware에서 넣어준 값
+    const { mbtiType, riskScore } = req.body;
+    console.log("userId", userId);
 
     try {
       const result = await saveTRService(userId, mbtiType, riskScore);

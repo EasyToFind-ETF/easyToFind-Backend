@@ -5,6 +5,8 @@ const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const cors = require("cors");
 const sequelize = require("./config/database"); // Sequelize 인스턴스 import
+const authMiddleware = require("./middlewares/authMiddleware"); // 경로에 따라 조정
+
 sequelize
   .sync() // 테이블 자동 생성 or 동기화
   .then(() => {
