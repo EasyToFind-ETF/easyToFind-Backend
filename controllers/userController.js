@@ -1,13 +1,29 @@
 const userService = require("../services/userService");
 const { createToken, verifyToken } = require("../utils/auth");
+const { successResponse, failResponse } = require("../common/Response");
+const responseMessage = require("../common/responseMessages");
 
 const userController = {
   signup: async (req, res, next) => {
     try {
       const { user_email, password, birth } = req.body;
       const user = await userService.signUp(user_email, password, birth);
-      res.status(201).json(user);
+      res.json(
+        successResponse(
+          responseMessage.success.modify.status,
+          responseMessage.success.modify.message,
+          user
+        )
+      );
     } catch (err) {
+      res
+        .status(500)
+        .json(
+          failResponse(
+            responseMessage.fail.modify.status,
+            responseMessage.fail.modify.message
+          )
+        );
       next(err);
     }
   },
@@ -21,7 +37,8 @@ const userController = {
       const token = createToken(user, tokenMaxAge);
 
       res.cookie("authToken", token, {
-        httpOnly: true,
+        httpOnly: false,
+        secure: false,
         maxAge: tokenMaxAge * 1000,
       });
 

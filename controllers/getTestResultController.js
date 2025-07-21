@@ -5,7 +5,7 @@ const { getTRService } = require("../services/getTestResultService");
 const getTestResultController = {
   getTestResultPage: async (req, res) => {
     const { riskScore } = req.body;
-    console.log("req", req.query);
+    console.log("req", req.body);
 
     try {
       const result = await getTRService(riskScore);
