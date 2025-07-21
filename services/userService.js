@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const User = require("../models/Users");
 
 const userService = {
-  signUp: async (user_email, password, birth) => {
+  signUp: async (user_email, password, birth, name) => {
     const existing = await User.findOne({ where: { user_email } });
     if (existing) throw new Error("이미 존재하는 이메일입니다.");
 
@@ -13,11 +13,13 @@ const userService = {
       user_email,
       password: hashed,
       birth,
+      name, // name 필드 추가
     });
 
     return {
       user_id: newUser.user_id,
       user_email: newUser.user_email,
+      name: newUser.name,
       birth: newUser.birth,
     };
   },

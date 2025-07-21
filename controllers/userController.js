@@ -6,22 +6,22 @@ const responseMessage = require("../common/responseMessages");
 const userController = {
   signup: async (req, res, next) => {
     try {
-      const { user_email, password, birth } = req.body;
-      const user = await userService.signUp(user_email, password, birth);
+      const { user_email, password, birth, name } = req.body;
+      const user = await userService.signUp(user_email, password, birth, name);
       res.json(
         successResponse(
-          responseMessage.success.modify.status,
-          responseMessage.success.modify.message,
+          responseMessage.success.create.status,
+          responseMessage.success.create.message,
           user
         )
       );
     } catch (err) {
       res
-        .status(500)
+        .status(400)
         .json(
           failResponse(
-            responseMessage.fail.modify.status,
-            responseMessage.fail.modify.message
+            responseMessage.fail.create.status,
+            err.message || responseMessage.fail.create.message
           )
         );
       next(err);
