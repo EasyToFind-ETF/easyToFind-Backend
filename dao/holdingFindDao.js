@@ -4,11 +4,10 @@ const getHoldingFindDao = async (
   sort,
   assetClass,
   theme,
-  isFavorite
+  isFavorite,
+  userId
 ) => {
   const params = [];
-  const conditions = [];
-
   let sql = `
     SELECT 
       e.etf_code, 
@@ -30,9 +29,17 @@ const getHoldingFindDao = async (
     params.push(`%${query}%`, `%${query}%`);
   }
 
-  sql += `) s ON eh.holdings_id = s.holdings_id\n`; // 서브쿼리 닫기
+  sql += `) s ON eh.holdings_id = s.holdings_id\n`;
 
-  sql += `WHERE 1=1\n`; // main WHERE
+  sql += `WHERE 1=1\n`;
+
+  // ✅ 관심 ETF 조건은 여기로 옮기자!
+  if (isFavorite === "true" && userId) {
+    sql += ` AND e.etf_code IN (
+      SELECT etf_code FROM user_favorites WHERE user_id = $${params.length + 1}
+    )`;
+    params.push(userId);
+  }
 
   if (assetClass && assetClass !== "전체") {
     sql += ` AND e.asset_class = $${params.length + 1}`;
@@ -47,8 +54,6 @@ const getHoldingFindDao = async (
   if (sort === "weight_pct") {
     sql += ` ORDER BY eh.weight_pct DESC`;
   }
-
-  console.log("🚀 최적화된 Holding Find SQL:", sql);
 
   const { rows } = await Connection.query(sql, params);
   return rows;

@@ -6,7 +6,8 @@ const getEtfFindService = async (
   sort,
   assetClass,
   theme,
-  isFavorite
+  isFavorite,
+  userId
 ) => {
   const connection = await pool.connect();
   try {
@@ -16,7 +17,8 @@ const getEtfFindService = async (
       sort,
       assetClass,
       theme,
-      isFavorite
+      isFavorite,
+      userId
     );
     return etfs;
   } finally {

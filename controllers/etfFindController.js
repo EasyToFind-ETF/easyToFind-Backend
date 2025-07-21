@@ -8,6 +8,16 @@ const etfFindController = {
     // console.log("✅ [Controller] etfFindController 도착!");
 
     const { query, sort, assetClass, theme, isFavorite } = req.query;
+    const userId = req.user?.user_id; // 인증된 사용자 ID
+
+    console.log("🎯 [Controller] ETF 검색 요청!", {
+      query,
+      sort,
+      assetClass,
+      theme,
+      isFavorite,
+      userId,
+    });
 
     try {
       const result = await getEtfFindService(
@@ -15,7 +25,8 @@ const etfFindController = {
         sort,
         assetClass,
         theme,
-        isFavorite
+        isFavorite,
+        userId
       );
 
       // console.log("🎯 [Controller] 서비스 결과:", result);
