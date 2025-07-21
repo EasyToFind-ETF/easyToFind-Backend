@@ -2,8 +2,7 @@ const { successResponse, failResponse } = require("../common/Response");
 const responseMessage = require("../common/responseMessages");
 
 const {
-  addFavorite,
-  removeFavorite,
+  etfFavoriteService,
   getFavoritesByUserId,
 } = require("../services/etfFavoriteService");
 
@@ -19,12 +18,12 @@ const etfFavoriteController = {
       if (!user_id)
         return res.status(401).json(failResponse(401, "로그인이 필요합니다!"));
 
-      await addFavorite(user_id, etf_code);
+      await etfFavoriteService.addFavorite(user_id, etf_code);
 
       // console.log("✅ 관심 ETF 추가 성공");
       res.json(successResponse(200, "관심 ETF 추가 완료! 🎉"));
     } catch (err) {
-      // console.error("❌ 관심 ETF 추가 실패:", err);
+      console.error("❌ 관심 ETF 추가 실패:", err);
       res.status(500).json(failResponse(500, "관심 ETF 추가 실패"));
     }
   },
@@ -37,11 +36,11 @@ const etfFavoriteController = {
       if (!user_id)
         return res.status(401).json(failResponse(401, "로그인이 필요합니다!"));
 
-      await removeFavorite(user_id, etf_code);
+      await etfFavoriteService.removeFavorite(user_id, etf_code);
 
       res.json(successResponse(200, "관심 ETF 삭제 완료! 🧹"));
     } catch (err) {
-      // console.error(err);
+      console.error("❌ 관심 ETF 삭제 실패:", err);
       res.status(500).json(failResponse(500, "관심 ETF 삭제 실패"));
     }
   },
