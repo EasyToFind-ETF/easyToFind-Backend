@@ -1,29 +1,32 @@
 const getTestResultDao = {
   getTRDao: async (connection, riskScore) => {
-    const query = `WITH user_input AS (
-  SELECT ($1/ 30.0) * 100.0 AS user_score_100  -- 예: 30점 → 100점
+    const query = `WITH params AS (
+  SELECT  ($1 / 35.0)*100 AS user_score
 ),
-scored_etfs AS (
+matched AS (
   SELECT
     ers.etf_code,
-    e.etf_name,
-    ers.score,
-    ers.return_1y,
-    ers.latest_aum,
-    ers.expense_ratio,
-    ROUND(100 * EXP( - POWER((ers.score - ui.user_score_100) / 18.0, 2) )::numeric, 2) AS match_score
-  FROM etf_recommendation_score ers
-  JOIN etfs e ON ers.etf_code = e.etf_code
-  CROSS JOIN user_input ui
+    ers.etf_score,
+    ers.stability_risk_score,
+    100 - ABS(p.user_score - ers.stability_risk_score) AS risk_match_score
+  FROM etf_recommendation_score ers, params p
+),
+ranked AS (
+  SELECT
+    etf_code,
+    etf_score,
+    stability_risk_score,
+    risk_match_score,
+    ROUND((0.7 * risk_match_score + 0.3 * etf_score)::numeric, 2) AS final_score
+  FROM matched
 )
 SELECT *
-FROM scored_etfs
-ORDER BY match_score DESC
+FROM ranked
+ORDER BY final_score DESC
 LIMIT 5;
 
-
-
 `;
+
     console.log("riskscore", riskScore);
     const result = await connection.query(query, [riskScore]);
     return result.rows;
