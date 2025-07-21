@@ -1,8 +1,10 @@
 // services/goalPlannerEngine/FiveYearEngine.js
 const { GoalSimEngine } = require("./GoalSimEngine");
+const config = require("../../config/goalPlanner");
+const { getRiskScoreMap, getQuality } = require("../../dao/riskMetricsDao");
 
 class FiveYearEngine extends GoalSimEngine {
-  async simulate(input, etfData) {
+  async simulate(input, etfData, connection) {
     const {
       targetAmount,
       targetYears,
@@ -12,25 +14,59 @@ class FiveYearEngine extends GoalSimEngine {
       themePreference,
     } = input;
 
-    const windowSize = targetYears * 12; // 개월 단위
-    const maxWindows = 60 - windowSize + 1; // 최대 윈도우 개수
+    const { windowLimit, contributionTiming, riskMatchSigma } = config;
+    const windowSize = targetYears * 12;
+
+    console.log("🧮 시뮬레이션 시작:", {
+      etfCount: etfData.length,
+      windowLimit,
+      contributionTiming,
+      riskMatchSigma,
+    });
+
+    // 1) 위험도 점수 맵 로드
+    const riskMap = await getRiskScoreMap(connection);
+    console.log("📊 위험도 점수 맵 로드 완료:", Object.keys(riskMap).length);
 
     const results = [];
 
     for (const etf of etfData) {
       if (etf.prices.length < windowSize) continue;
 
-      const hitRate = this.calculateHitRate(
-        etf.prices,
-        targetAmount,
-        initialAmount,
-        monthlyContribution,
-        windowSize,
-        maxWindows
-      );
+      // 2) 모든 월별 로그수익률 벡터화
+      const monthlyRets = this.toMonthlyLogReturns(etf.prices);
 
-      const riskMatch = this.calculateRiskMatch(etf, riskProfile);
-      const goalScore = this.calculateGoalScore(hitRate, riskMatch);
+      // 3) 창 개수 결정 (≤ windowLimit, else full)
+      const maxWin = Math.min(windowLimit, monthlyRets.length - windowSize + 1);
+
+      let hit = 0;
+      for (let w = 0; w < maxWin; w++) {
+        const sliceRets = monthlyRets.slice(w, w + windowSize);
+        const endVal = this.dcaSim(
+          sliceRets,
+          initialAmount,
+          monthlyContribution,
+          contributionTiming
+        );
+
+        if (endVal >= targetAmount) hit++;
+      }
+
+      const hitRate = (hit / maxWin) * 100;
+
+      // 4) RiskMatch via Gaussian
+      const etfRisk = riskMap[etf.etf_code] ?? 50;
+      const riskMatch =
+        Math.exp(-Math.pow((etfRisk - riskProfile) / riskMatchSigma, 2)) * 100;
+
+      // 5) QualityScore (비용·유동성·Premium)
+      const quality = await getQuality(connection, etf.etf_code);
+
+      const qualityScorePct = quality.quality_total * 100;
+
+      const goalScore = parseFloat(
+        (hitRate * 0.7 + riskMatch * 0.2 + quality.quality * 0.1).toFixed(2)
+      );
 
       results.push({
         etf_code: etf.etf_code,
@@ -39,96 +75,82 @@ class FiveYearEngine extends GoalSimEngine {
         theme: etf.theme,
         hit_rate: hitRate,
         risk_match: riskMatch,
+        quality_score: qualityScorePct, // 0-1 스케일
         goal_score: goalScore,
-        window_count: maxWindows,
+        window_count: maxWin,
+        expense_ratio: quality.cost * 100, // 0-1 스케일
+        liquidity_score: quality.liquidity * 100, // 0-1 스케일
+        quality_components: {
+          cost: quality.cost * 100,
+          liquidity: quality.liquidity * 100,
+          quality: quality.quality * 100,
+        },
       });
     }
 
     // 목표 점수 순으로 정렬
     results.sort((a, b) => b.goal_score - a.goal_score);
-
-    // 상위 10개만 반환
     const topResults = results.slice(0, 10);
+
+    console.log("✅ 시뮬레이션 완료:", results.length, "개 ETF 처리");
 
     return {
       recommendations: topResults,
       meta: {
-        dataHorizonMonths: 60,
-        windowCount: maxWindows,
-        reliability: this.getReliabilityLevel(maxWindows),
+        dataHorizonMonths: config.dataHorizonMonths,
+        windowCount: Math.min(windowLimit, 60 - windowSize + 1),
+        reliability: this.getReliabilityLevel(
+          Math.min(windowLimit, 60 - windowSize + 1)
+        ),
         targetAmount,
         targetYears,
-        requiredCAGR: this.calculateRequiredCAGR(
+        requiredCAGR: this.requiredCagr(
           targetAmount,
           initialAmount,
           monthlyContribution,
           targetYears
         ),
+        config: {
+          windowLimit,
+          etfLimit: config.etfLimit,
+          contributionTiming,
+          riskMatchSigma,
+        },
       },
     };
   }
 
-  calculateHitRate(
-    prices,
-    targetAmount,
-    initialAmount,
-    monthlyContribution,
-    windowSize,
-    maxWindows
-  ) {
-    let hitCount = 0;
-    let totalWindows = 0;
+  dcaSim(monthlyRets, initialAmt, monthlyContr, timing = "end") {
+    let pv = initialAmount;
 
-    for (let i = 0; i <= prices.length - windowSize; i++) {
-      const windowPrices = prices.slice(i, i + windowSize);
-      const startPrice = windowPrices[0].price;
-      const endPrice = windowPrices[windowPrices.length - 1].price;
+    monthlyRets.forEach((LogRet, idx) => {
+      const monthlyReturn = Math.exp(logRet) - 1;
 
-      // CAGR 계산
-      const totalReturn = (endPrice - startPrice) / startPrice;
-      const cagr = Math.pow(1 + totalReturn, 1 / (windowSize / 12)) - 1;
-
-      // 목표 달성 시뮬레이션
-      let currentAmount = initialAmount;
-      for (let month = 0; month < windowSize; month++) {
-        const monthlyReturn = Math.pow(1 + cagr, 1 / 12) - 1;
-        currentAmount =
-          (currentAmount + monthlyContribution) * (1 + monthlyReturn);
+      if (timing === "start") {
+        pv += monthlyContr;
       }
 
-      if (currentAmount >= targetAmount) {
-        hitCount++;
-      }
-      totalWindows++;
-    }
+      pv *= 1 + monthlyReturn;
 
-    return totalWindows > 0 ? (hitCount / totalWindows) * 100 : 0;
+      if (timing === "end") {
+        pv += monthlyContr;
+      }
+    });
+
+    return pv;
   }
 
-  calculateRiskMatch(etf, riskProfile) {
-    // 간단한 위험도 계산 (변동성 기반)
-    const prices = etf.prices.map((p) => p.price);
-    const returns = [];
+  toMonthlyLogReturns(prices) {
+    const monthlyReturns = [];
 
     for (let i = 1; i < prices.length; i++) {
-      returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+      const prevPrice = prices[i - 1].price;
+      const currPrice = prices[i].price;
+      const logReturn = Math.log(currPrice / prevPrice);
+      monthlyReturns.push(logReturn);
     }
 
-    const volatility = Math.sqrt(
-      returns.reduce((sum, r) => sum + r * r, 0) / returns.length
-    );
-    const etfRiskScore = Math.min(volatility * 1000, 100); // 0-100 스케일로 변환
-
-    // 위험도 매칭 점수 계산 (가우시안 함수 사용)
-    const riskMatch =
-      Math.exp(-Math.pow((etfRiskScore - riskProfile) / 20, 2)) * 100;
-
-    return Math.round(riskMatch * 100) / 100;
-  }
-
-  calculateGoalScore(hitRate, riskMatch) {
-    // 목표 점수 = 히트율 * 0.7 + 위험도 매칭 * 0.3
-    return Math.round((hitRate * 0.7 + riskMatch * 0.3) * 100) / 100;
+    return monthlyReturns;
   }
 
   getReliabilityLevel(windowCount) {
@@ -137,25 +159,18 @@ class FiveYearEngine extends GoalSimEngine {
     return "low";
   }
 
-  calculateRequiredCAGR(
-    targetAmount,
-    initialAmount,
-    monthlyContribution,
-    years
-  ) {
-    // 목표 달성을 위한 필요 CAGR 계산
+  requiredCagr(targetAmount, initialAmount, monthlyContribution, years) {
     const totalMonths = years * 12;
     const totalContribution = initialAmount + monthlyContribution * totalMonths;
 
     if (totalContribution >= targetAmount) {
-      return 0; // 납입액만으로도 목표 달성 가능
+      return 0;
     }
 
-    // CAGR 계산 공식
     const requiredReturn = targetAmount / totalContribution;
     const cagr = Math.pow(requiredReturn, 1 / years) - 1;
 
-    return Math.round(cagr * 100 * 100) / 100; // 퍼센트로 반환
+    return Math.round(cagr * 100 * 100) / 100;
   }
 }
 
