@@ -1,8 +1,11 @@
 // routes/goalPlannerRouter.js
 const express = require("express");
 const { calculateGoalPlan } = require("../controllers/goalPlannerController");
+const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
+
+router.use(authMiddleware);
 
 // 모든 요청에 대한 로그
 router.use((req, res, next) => {
@@ -21,6 +24,7 @@ router.options("/", (req, res) => {
 router.post("/", (req, res) => {
   console.log(" POST 요청 처리 시작");
   console.log("📝 Request body:", JSON.stringify(req.body, null, 2));
+  console.log("사용자 정보:", req.user);
 
   try {
     calculateGoalPlan(req, res);
@@ -28,15 +32,6 @@ router.post("/", (req, res) => {
     console.log("❌ 라우터에서 에러 발생:", error);
     res.status(500).json({ error: error.message });
   }
-});
-
-// GET 요청 추가 (테스트용)
-router.get("/", (req, res) => {
-  console.log("🎯 GET 요청 도착!");
-  res.json({
-    message: "Goal Planner API is working!",
-    timestamp: new Date().toISOString(),
-  });
 });
 
 module.exports = router;
