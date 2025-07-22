@@ -1,61 +1,50 @@
 // dao/riskMetricsDao.js
-const getRiskScoreMap = async (connection) => {
-  const sql = `
-      SELECT etf_code, stability_risk_score
-      FROM etf_recommendation_score
-      WHERE stability_risk_score IS NOT NULL
+const getPersonalScoreMap = async (connection, userId) => {
+  let sql;
+  let params;
+
+  if (userId) {
+    // 로그인한 사용자: DB에서 가중치 조회
+    sql = `
+      SELECT 
+        e.etf_code,
+        ROUND(
+          (COALESCE(e.stability_score, 50) * COALESCE(u.stability_weight, 0.25) +
+          COALESCE(e.liquidity_score, 50) * COALESCE(u.liquidity_weight, 0.25) +
+          COALESCE(e.growth_score, 50) * COALESCE(u.growth_weight, 0.25) +
+          COALESCE(e.diversification_score, 50) * COALESCE(u.diversification_weight, 0.25))::numeric
+        , 2) AS personal_score
+      FROM etf_recommendation_score e
+      JOIN users u ON u.user_id = $1
+      WHERE e.base_date = (SELECT MAX(base_date) FROM etf_recommendation_score)
     `;
-
-  const { rows } = await connection.query(sql);
-
-  const riskMap = {};
-  rows.forEach((row) => {
-    riskMap[row.etf_code] = row.stability_risk_score;
-  });
-
-  return riskMap;
-};
-
-const getQuality = async (connection, etfCode) => {
-  const sql = `
-      WITH ranks AS (
-        SELECT
-          etf_code,
-          1 - PERCENT_RANK() OVER (ORDER BY expense_ratio) AS cost_score,
-          PERCENT_RANK() OVER (ORDER BY latest_aum) AS liquidity_score,
-          COALESCE(etf_score, 50) / 100 AS premium_score -- 네이밍 변경
-        FROM etf_recommendation_score
-        WHERE expense_ratio IS NOT NULL 
-          AND latest_aum IS NOT NULL
-      )
-      SELECT
-        cost_score,
-        liquidity_score,
-        premium_score,
-        (0.4 * cost_score + 0.35 * liquidity_score + 0.25 * premium_score) AS quality_total
-      FROM ranks
-      WHERE etf_code = $1
+    params = [userId];
+  } else {
+    // 비로그인 사용자: 기본 가중치 (0.25, 0.25, 0.25, 0.25) 사용
+    sql = `
+      SELECT 
+        e.etf_code,
+        ROUND(
+          (COALESCE(e.stability_score, 50) * 0.25 +
+          COALESCE(e.liquidity_score, 50) * 0.25 +
+          COALESCE(e.growth_score, 50) * 0.25 +
+          COALESCE(e.diversification_score, 50) * 0.25)::numeric
+        , 2) AS personal_score
+      FROM etf_recommendation_score e
+      WHERE e.base_date = (SELECT MAX(base_date) FROM etf_recommendation_score)
     `;
-
-  const { rows } = await connection.query(sql, [etfCode]);
-
-  if (rows.length === 0) {
-    return {
-      cost: 0.5,
-      liquidity: 0.5,
-      premium: 0.5, // 네이밍 변경
-      quality_total: 0.5,
-    };
+    params = [];
   }
 
-  const row = rows[0];
+  const { rows } = await connection.query(sql, params);
+  console.log("📊 개인화 점수 조회 결과:", rows.length, "개 ETF");
 
-  return {
-    cost: row.cost_score,
-    liquidity: row.liquidity_score,
-    premium: row.premium_score, // 네이밍 변경
-    quality_total: row.quality_total,
-  };
+  const personalMap = {};
+  rows.forEach((row) => {
+    personalMap[row.etf_code] = row.personal_score;
+  });
+
+  return personalMap;
 };
 
-module.exports = { getRiskScoreMap, getQuality };
+module.exports = { getPersonalScoreMap };

@@ -1,11 +1,8 @@
 // routes/goalPlannerRouter.js
 const express = require("express");
 const { calculateGoalPlan } = require("../controllers/goalPlannerController");
-const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
-
-router.use(authMiddleware);
 
 // 모든 요청에 대한 로그
 router.use((req, res, next) => {

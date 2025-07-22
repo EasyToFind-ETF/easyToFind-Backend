@@ -1,7 +1,7 @@
 // services/goalPlannerEngine/FiveYearEngine.js
 const { GoalSimEngine } = require("./GoalSimEngine");
 const config = require("../../config/goalPlanner");
-const { getRiskScoreMap, getQuality } = require("../../dao/riskMetricsDao");
+const { getPersonalScoreMap } = require("../../dao/riskMetricsDao");
 
 class FiveYearEngine extends GoalSimEngine {
   async simulate(input, etfData, connection) {
@@ -10,23 +10,26 @@ class FiveYearEngine extends GoalSimEngine {
       targetYears,
       initialAmount,
       monthlyContribution,
-      riskProfile,
+      riskProfile, // 이제 userId로 사용
       themePreference,
     } = input;
 
-    const { windowLimit, contributionTiming, riskMatchSigma } = config;
+    const { windowLimit, contributionTiming } = config;
     const windowSize = targetYears * 12;
 
     console.log("🧮 시뮬레이션 시작:", {
       etfCount: etfData.length,
       windowLimit,
       contributionTiming,
-      riskMatchSigma,
+      userId: riskProfile, // userId로 변경
     });
 
-    // 1) 위험도 점수 맵 로드
-    const riskMap = await getRiskScoreMap(connection);
-    console.log("📊 위험도 점수 맵 로드 완료:", Object.keys(riskMap).length);
+    // 1) 개인화 점수 맵 로드 (userId 기반)
+    const personalMap = await getPersonalScoreMap(connection, riskProfile);
+    console.log(
+      "📊 개인화 점수 맵 로드 완료:",
+      Object.keys(personalMap).length
+    );
 
     const results = [];
 
@@ -54,18 +57,12 @@ class FiveYearEngine extends GoalSimEngine {
 
       const hitRate = (hit / maxWin) * 100;
 
-      // 4) RiskMatch via Gaussian
-      const etfRisk = riskMap[etf.etf_code] ?? 50;
-      const riskMatch =
-        Math.exp(-Math.pow((etfRisk - riskProfile) / riskMatchSigma, 2)) * 100;
+      // 4) 개인화 점수 (기존 위험도 매칭 대체)
+      const personalScore = personalMap[etf.etf_code] ?? 50; // 기본값 50
 
-      // 5) QualityScore (비용·유동성·Premium)
-      const quality = await getQuality(connection, etf.etf_code);
-
-      const qualityScorePct = quality.quality_total * 100;
-
+      // 5) 최종 점수 계산 (hitRate 70% + personal_score 30%)
       const goalScore = parseFloat(
-        (hitRate * 0.7 + riskMatch * 0.2 + quality.quality * 0.1).toFixed(2)
+        (hitRate * 0.7 + personalScore * 0.3).toFixed(2)
       );
 
       results.push({
@@ -74,17 +71,9 @@ class FiveYearEngine extends GoalSimEngine {
         asset_class: etf.asset_class,
         theme: etf.theme,
         hit_rate: hitRate,
-        risk_match: riskMatch,
-        quality_score: qualityScorePct, // 0-1 스케일
+        personal_score: personalScore,
         goal_score: goalScore,
         window_count: maxWin,
-        expense_ratio: quality.cost * 100, // 0-1 스케일
-        liquidity_score: quality.liquidity * 100, // 0-1 스케일
-        quality_components: {
-          cost: quality.cost * 100,
-          liquidity: quality.liquidity * 100,
-          quality: quality.quality * 100,
-        },
       });
     }
 
@@ -114,16 +103,15 @@ class FiveYearEngine extends GoalSimEngine {
           windowLimit,
           etfLimit: config.etfLimit,
           contributionTiming,
-          riskMatchSigma,
         },
       },
     };
   }
 
   dcaSim(monthlyRets, initialAmt, monthlyContr, timing = "end") {
-    let pv = initialAmount;
+    let pv = initialAmt;
 
-    monthlyRets.forEach((LogRet, idx) => {
+    monthlyRets.forEach((logRet, idx) => {
       const monthlyReturn = Math.exp(logRet) - 1;
 
       if (timing === "start") {
