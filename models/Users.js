@@ -19,7 +19,7 @@ const User = sequelize.define(
     },
     name: {
       type: DataTypes.STRING,
-      allowNull: true, // 선택사항으로 설정
+      allowNull: false, // 선택사항으로 설정
     },
     password: {
       type: DataTypes.STRING,
@@ -30,6 +30,11 @@ const User = sequelize.define(
       allowNull: true, // 생일을 필수로 받고 싶다면 false
     },
     created_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+    updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
