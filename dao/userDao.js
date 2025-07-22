@@ -1,13 +1,13 @@
 const bcrypt = require("bcrypt");
 
 const userDao = {
-  createUser: async (connection, email, hashedPassword, brith) => {
+  createUser: async (connection, email, hashedPassword, brith, name) => {
     const query = `
-      INSERT INTO users (email, password)
-      VALUES ($1, $2)
+      INSERT INTO users (email, password,brith,name)
+      VALUES ($1, $2,$3,$4)
       RETURNING id, email;
     `;
-    const values = [email, hashedPassword];
+    const values = [email, hashedPassword, brith, name];
     const result = await db.query(query, values);
     return result.rows[0];
   },
