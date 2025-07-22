@@ -41,8 +41,6 @@ const userController = {
 
       const tokenMaxAge = 60 * 60 * 24 * 3;
       const token = createToken(user, tokenMaxAge);
-
-      // ✅ 쿠키 먼저 설정
       res
         .cookie("authToken", token, {
           httpOnly: false,
@@ -50,15 +48,19 @@ const userController = {
           sameSite: "Lax",
           maxAge: tokenMaxAge * 1000,
         })
-        .json({ token });
-
-      // ✅ 그리고 바로 응답 (절대 next() 호출하거나 비동기 중간 끼지 말 것)
-      res.status(200).json({
-        user_id: user.user_id,
-        user_email: user.user_email,
-      });
+        .status(200)
+        .json({
+          user_id: user.user_id,
+          user_email: user.user_email,
+          token,
+        });
     } catch (err) {
-      next(err);
+      console.error("❗로그인 오류:", err.message);
+
+      // ✅ 에러 응답 명시적으로 전달
+      res.status(400).json({
+        message: err.message || "로그인 중 오류가 발생했습니다.",
+      });
     }
   },
 
