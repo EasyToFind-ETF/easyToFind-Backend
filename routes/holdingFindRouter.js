@@ -1,6 +1,6 @@
 const express = require("express");
 const { getHoldingFindPage } = require("../controllers/holdingFindController");
-const verifyToken = require("../middlewares/verifyToken");
+const verifyToken = require("../middleware/verifyToken");
 
 const router = express.Router();
 
