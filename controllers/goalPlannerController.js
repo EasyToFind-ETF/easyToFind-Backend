@@ -1,9 +1,6 @@
 const { successResponse, failResponse } = require("../common/Response");
 const responseMessage = require("../common/responseMessages");
 const { calculateGoalPlanService } = require("../services/goalPlannerService");
-const {
-  getUserRiskProfileService,
-} = require("../services/userRiskProfileService");
 const config = require("../config/goalPlanner");
 
 // controllers/goalPlannerController.js에서
@@ -43,36 +40,18 @@ const goalPlannerController = {
         });
       }
 
-      let riskProfile = 50;
-
-      if (req.user) {
-        console.log("로그인 된 사용자 ID:", req.user.user_id);
-        const userRiskScore = await getUserRiskProfileService(req.user.user_id);
-
-        if (userRiskScore !== null) {
-          riskProfile = Math.round((userRiskScore / 30) * 100);
-          console.log(
-            "사용자 위험 성향 점수:",
-            userRiskScore,
-            "-> 변환:",
-            riskProfile
-          );
-        } else {
-          console.log("사용자 위험 성향 정보 없음, 기본값 사용");
-        }
-      } else {
-        console.log("비로그인 사용자, 기본 위험 성향 사용");
-      }
+      // 사용자 ID 처리 (로그인 여부에 따라)
+      const userId = req.user ? req.user.user_id : null;
+      console.log("사용자 ID:", userId || "비로그인 사용자");
 
       console.log("✅ 입력 검증 통과, 서비스 호출 시작");
-      console.log("🎯 최종 위험 성향:", riskProfile);
 
       const result = await calculateGoalPlanService({
         targetAmount,
         targetYears,
         initialAmount,
         monthlyContribution,
-        riskProfile,
+        riskProfile: userId, // null이면 기본 가중치 사용
         themePreference,
       });
 
@@ -88,4 +67,5 @@ const goalPlannerController = {
     }
   },
 };
+
 module.exports = goalPlannerController;

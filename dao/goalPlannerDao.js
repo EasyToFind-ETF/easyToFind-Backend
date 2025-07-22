@@ -5,8 +5,8 @@ const getGoalPlanDao = async (connection, etfLimit) => {
       SELECT e.etf_code, e.etf_name, e.asset_class, e.theme
       FROM etfs e
       JOIN etf_recommendation_score ers ON e.etf_code = ers.etf_code
-      WHERE ers.latest_aum IS NOT NULL
-      ORDER BY ers.latest_aum DESC
+      WHERE ers.base_date = (SELECT MAX(base_date) FROM etf_recommendation_score)
+      ORDER BY COALESCE(ers.latest_aum, 0) DESC
       LIMIT $1
     )
     SELECT
@@ -33,7 +33,7 @@ const getGoalPlanDao = async (connection, etfLimit) => {
   console.log("🗄️ DAO: SQL 쿼리 실행, etfLimit:", etfLimit);
 
   const { rows } = await connection.query(sql, [etfLimit]);
-  console.log("��️ DAO: 조회된 ETF 수:", rows.length);
+  console.log("️ DAO: 조회된 ETF 수:", rows.length);
 
   // JSON 파싱하여 반환
   const result = rows.map((r) => r.etf_json);
