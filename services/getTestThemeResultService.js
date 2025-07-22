@@ -2,15 +2,21 @@ const { getTTRDao } = require("../dao/getTestThemeResultDao");
 const pool = require("../common/database");
 
 const getTestThemeResultService = {
-  getTTRService: async (returnRate, liquidity, trackingError, aum, theme) => {
+  getTTRService: async (
+    stabilityScore,
+    liquidityScore,
+    growthScore,
+    divScore,
+    theme
+  ) => {
     const client = await pool.connect();
     try {
       const result = await getTTRDao(
         client,
-        returnRate,
-        liquidity,
-        trackingError,
-        aum,
+        stabilityScore,
+        liquidityScore,
+        growthScore,
+        divScore,
         theme
       );
       if (result.length === 0) {

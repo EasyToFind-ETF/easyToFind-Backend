@@ -4,15 +4,15 @@ const { getTRService } = require("../services/getTestResultService");
 
 const getTestResultController = {
   getTestResultPage: async (req, res) => {
-    const { returnRate, liquidity, trackingError, aum } = req.body;
-    console.log("req", req.body);
+    const { stabilityScore, liquidityScore, growthScore, divScore } = req.body;
+    console.log("reqcontroller", req.body);
 
     try {
       const result = await getTRService(
-        returnRate,
-        liquidity,
-        trackingError,
-        aum
+        stabilityScore,
+        liquidityScore,
+        growthScore,
+        divScore
       );
       res.json(
         successResponse(

@@ -1,122 +1,79 @@
 const getTestThemeResultDao = {
   getTTRDao: async (
     connection,
-    returnRate,
-    liquidity,
-    trackingError,
-    aum,
+    stabilityScore,
+    liquidityScore,
+    growthScore,
+    divScore,
     theme
   ) => {
     const query = `
-WITH latest_data AS (
-  SELECT DISTINCT ON (etf_code)
-    etf_code,
-    close_price,
-    nav_price,
-    change_rate,
-    acc_trd_val,
-    aum,
-    trade_date
-  FROM new_prices_daily
-  ORDER BY etf_code, trade_date DESC
-),
-prepared AS (
+WITH normalized_weights AS (
   SELECT
-    l.*,
+    $1::numeric AS w1_raw,  -- stability
+    $2::numeric AS w2_raw,  -- liquidity
+    $3::numeric AS w3_raw,  -- growth
+    $4::numeric AS w4_raw   -- diversification
+),
+weight_sum AS (
+  SELECT
+    w1_raw + w2_raw + w3_raw + w4_raw AS total
+  FROM normalized_weights
+),
+user_weights AS (
+  SELECT
+    w1_raw / total AS w1,
+    w2_raw / total AS w2,
+    w3_raw / total AS w3,
+    w4_raw / total AS w4
+  FROM normalized_weights, weight_sum
+),
+scored_etfs AS (
+  SELECT
+    ers.etf_code,
     e.etf_name,
     e.theme,
-    ABS(l.close_price - l.nav_price) AS tracking_error
-  FROM latest_data l
-  JOIN etfs e ON l.etf_code = e.etf_code
-  WHERE e.theme = $5
-),
-stats AS (
-  SELECT
-    AVG(change_rate) AS avg_return,
-    STDDEV(change_rate) AS std_return,
-    AVG(acc_trd_val) AS avg_liquidity,
-    STDDEV(acc_trd_val) AS std_liquidity,
-    AVG(tracking_error) AS avg_error,
-    STDDEV(tracking_error) AS std_error,
-    AVG(aum) AS avg_aum,
-    STDDEV(aum) AS std_aum
-  FROM prepared
-),
-zscore_raw AS (
-  SELECT
-    p.etf_code,
-    p.etf_name,
-    p.theme,
-    p.change_rate,
-    p.acc_trd_val,
-    p.aum,
-    ((p.change_rate - s.avg_return) / NULLIF(s.std_return, 0)) AS z_ret,
-    ((p.acc_trd_val - s.avg_liquidity) / NULLIF(s.std_liquidity, 0)) AS z_liq,
-    -1 * ((ABS(p.close_price - p.nav_price) - s.avg_error) / NULLIF(s.std_error, 0)) AS z_err,
-    ((p.aum - s.avg_aum) / NULLIF(s.std_aum, 0)) AS z_aum
-  FROM prepared p, stats s
-),
-log_scaled AS (
-  SELECT
-    *,
-    LN(1 + GREATEST(z_ret, 0)) AS log_ret,
-    LN(1 + GREATEST(z_liq, 0)) AS log_liq,
-    LN(1 + GREATEST(z_err, 0)) AS log_err,
-    LN(1 + GREATEST(z_aum, 0)) AS log_aum
-  FROM zscore_raw
-),
-norm_range AS (
-  SELECT
-    MIN(log_ret) AS min_ret, MAX(log_ret) AS max_ret,
-    MIN(log_liq) AS min_liq, MAX(log_liq) AS max_liq,
-    MIN(log_err) AS min_err, MAX(log_err) AS max_err,
-    MIN(log_aum) AS min_aum, MAX(log_aum) AS max_aum
-  FROM log_scaled
-),
-normalized AS (
-  SELECT
-    l.etf_code,
-    l.etf_name,
-    l.change_rate,
-    l.acc_trd_val,
-    l.aum,
-    (l.log_ret - r.min_ret) / NULLIF(r.max_ret - r.min_ret, 0) AS norm_ret,
-    (l.log_liq - r.min_liq) / NULLIF(r.max_liq - r.min_liq, 0) AS norm_liq,
-    (l.log_err - r.min_err) / NULLIF(r.max_err - r.min_err, 0) AS norm_err,
-    (l.log_aum - r.min_aum) / NULLIF(r.max_aum - r.min_aum, 0) AS norm_aum
-  FROM log_scaled l, norm_range r
-),
-final AS (
-  SELECT
-    n.*,
+    ers.stability_score,
+    ers.liquidity_score,
+    ers.growth_score,
+    ers.diversification_score,
+    
     ROUND((
-      $1 * norm_ret +
-      $2 * norm_liq +
-      $3 * norm_err +
-      $4 * norm_aum
-    ) * 100.0, 2) AS total_score
-  FROM normalized n
+      ers.stability_score * uw.w1 +
+      ers.liquidity_score * uw.w2 +
+      ers.growth_score * uw.w3 +
+      ers.diversification_score * uw.w4
+    )::numeric, 2) AS total_score
+  FROM etf_recommendation_score ers
+  JOIN etfs e ON ers.etf_code = e.etf_code
+  CROSS JOIN user_weights uw
+  WHERE
+    ers.stability_score IS NOT NULL AND
+    ers.liquidity_score IS NOT NULL AND
+    ers.growth_score IS NOT NULL AND
+    ers.diversification_score IS NOT NULL AND
+    e.theme = $5  -- 테마 필터 추가
 )
-SELECT
-  f.etf_name,
-  ROUND(f.change_rate::numeric, 2) AS return_rate,
-  f.acc_trd_val AS liquidity,
-  f.aum,
-  ers.stability_risk_score,
-  f.total_score
-FROM final f
-LEFT JOIN etf_recommendation_score ers ON f.etf_code = ers.etf_code
+SELECT *
+FROM scored_etfs
 ORDER BY total_score DESC
 LIMIT 5;
 
 
 `;
-    console.log("ddd", returnRate, liquidity, trackingError, aum, theme);
+    console.log(
+      "ddd",
+      stabilityScore,
+      liquidityScore,
+      growthScore,
+      divScore,
+      theme
+    );
     const result = await connection.query(query, [
-      returnRate,
-      liquidity,
-      trackingError,
-      aum,
+      stabilityScore,
+      liquidityScore,
+      growthScore,
+      divScore,
       theme,
     ]);
     return result.rows;
