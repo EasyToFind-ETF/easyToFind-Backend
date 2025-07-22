@@ -5,9 +5,10 @@ const { getEtfOneService } = require("../services/etfCompareService");
 const etfCompareController = {
   getEtfOneData: async (req, res) => {
     const { etf_code } = req.params;
+    const userId = req.user?.user_id ?? null;
 
     try {
-      const result = await getEtfOneService(etf_code);
+      const result = await getEtfOneService(etf_code, userId);
 
       if (!result) {
         return res
