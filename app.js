@@ -7,6 +7,9 @@ const cors = require("cors");
 const sequelize = require("./config/database"); // Sequelize 인스턴스 import
 const authMiddleware = require("./middlewares/authMiddleware"); // 경로에 따라 조정
 
+// ETF 캐싱 스케줄러 import
+require("./services/schedulerService/etfCachingScheduler");
+
 sequelize
   .sync() // 테이블 자동 생성 or 동기화
   .then(() => {
