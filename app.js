@@ -31,6 +31,7 @@ const userRouter = require("./routes/userRouter");
 const etfDetailRouter = require("./routes/etfDetailRouter");
 const goalPlannerRouter = require("./routes/goalPlannerRouter");
 const etfFavoriteRouter = require("./routes/etfFavoriteRouter");
+const userMypageRouter = require("./routes/userMypageRouter");
 const app = express();
 
 app.use(logger("dev"));
