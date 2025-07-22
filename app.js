@@ -61,6 +61,7 @@ app.use("/api/auth", userRouter);
 app.use("/api/goal-planner", goalPlannerRouter);
 app.use("/api/etfs", etfDetailRouter);
 app.use("/api/me", etfFavoriteRouter);
+app.use("/api/me/mypage", userMypageRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
