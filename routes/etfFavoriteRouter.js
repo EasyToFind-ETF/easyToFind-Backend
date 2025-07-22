@@ -1,6 +1,6 @@
 const express = require("express");
 const etfFavoriteController = require("../controllers/etfFavoriteController");
-const verifyToken = require("../middlewares/verifyToken"); // ← JWT 디코딩 미들웨어
+const verifyToken = require("../middleware/verifyToken"); // ← JWT 디코딩 미들웨어
 
 const router = express.Router();
 

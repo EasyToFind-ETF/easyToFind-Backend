@@ -1,4 +1,3 @@
-const { get } = require("../app");
 const pool = require("../common/database");
 const { insertFavorite, deleteFavorite } = require("../dao/etfFavoriteDao");
 
