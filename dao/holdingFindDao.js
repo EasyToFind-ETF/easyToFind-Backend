@@ -17,8 +17,12 @@ const getHoldingFindDao = async (
     (!theme || theme === "전체");
 
   if (isOnlySortWeightPct) {
+    console.log(
+      "📦 HoldingFindDao: weight_pct 정렬만 요청됨, 캐시 데이터 사용"
+    );
     const jsonPath = path.join(__dirname, "../data/holdings_none.json");
     const rawData = fs.readFileSync(jsonPath);
+    console.log("rawData:", rawData.toString());
     const parsed = JSON.parse(rawData);
     return parsed.data;
   }
@@ -49,7 +53,6 @@ const getHoldingFindDao = async (
 
   sql += `WHERE 1=1\n`;
 
-  // ✅ 관심 ETF 조건은 여기로 옮기자!
   if (isFavorite === "true" && userId) {
     sql += ` AND e.etf_code IN (
       SELECT etf_code FROM user_favorites WHERE user_id = $${params.length + 1}
