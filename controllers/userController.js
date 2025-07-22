@@ -7,6 +7,12 @@ const userController = {
   signup: async (req, res, next) => {
     try {
       const { user_email, password, birth, name } = req.body;
+      console.log("📝 회원가입 요청 데이터:", {
+        user_email,
+        password,
+        birth,
+        name,
+      });
       const user = await userService.signUp(user_email, password, birth, name);
       res.json(
         successResponse(
