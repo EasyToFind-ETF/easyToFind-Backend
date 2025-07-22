@@ -2,9 +2,13 @@ const { Pool } = require("pg");
 
 const pool = require("../../common/database");
 
-(async () => {
+async function updateEtfCache() {
   const client = await pool.connect();
+  const startTime = Date.now();
+
   try {
+    console.log("🔄 ETF 캐싱 시작...");
+
     const today = new Date();
     const format = (d) => d.toISOString().split("T")[0];
 
@@ -17,6 +21,7 @@ const pool = require("../../common/database");
       "3년": format(new Date(today.getTime() - 3 * 365 * 24 * 60 * 60 * 1000)),
     };
 
+    console.log("📊 기간별 데이터 수집 중...");
     const unionQueries = Object.entries(periods)
       .map(
         ([label, date]) => `
@@ -25,7 +30,7 @@ const pool = require("../../common/database");
             p.etf_code, '${label}' AS period_label,
             p.trade_date, p.close_price, p.aum,
             ROW_NUMBER() OVER (PARTITION BY p.etf_code ORDER BY p.trade_date DESC) AS rn
-          FROM prices_daily p
+          FROM new_prices_daily p
           WHERE p.trade_date <= '${date}'
         ) sub
         WHERE rn = 1
@@ -37,7 +42,7 @@ const pool = require("../../common/database");
       WITH latest_price AS (
         SELECT DISTINCT ON (etf_code)
           etf_code, close_price AS latest_price
-        FROM prices_daily
+        FROM new_prices_daily
         ORDER BY etf_code, trade_date DESC
       ),
       filtered_prices AS (
@@ -49,7 +54,7 @@ const pool = require("../../common/database");
           p.trade_date AS first_trade_date,
           p.close_price AS first_price,
           p.aum AS first_aum
-        FROM prices_daily p
+        FROM new_prices_daily p
         JOIN etfs e ON p.etf_code = e.etf_code
         WHERE p.trade_date >= e.inception_date
         ORDER BY p.etf_code, p.trade_date ASC
@@ -65,10 +70,13 @@ const pool = require("../../common/database");
       LEFT JOIN first_price fsp ON fp.etf_code = fsp.etf_code;
     `;
 
+    console.log("🔍 데이터베이스 쿼리 실행 중...");
     const result = await client.query(sql);
+    console.log(`📈 ${result.rows.length}개의 데이터 조회 완료`);
 
     const grouped = {};
 
+    console.log("📊 데이터 그룹핑 중...");
     result.rows.forEach((row) => {
       const {
         etf_code,
@@ -107,6 +115,7 @@ const pool = require("../../common/database");
       }
     });
 
+    console.log(`💾 ${Object.keys(grouped).length}개 ETF 캐시 업데이트 중...`);
     const upserts = Object.values(grouped).map((etf) => {
       const r = etf.수익률;
       return client.query(
@@ -147,11 +156,18 @@ const pool = require("../../common/database");
     });
 
     await Promise.all(upserts);
-    console.log("✅ etf_return_cache 캐시 업데이트 완료!");
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.log(`✅ etf_return_cache 캐시 업데이트 완료! (${duration}초 소요)`);
   } catch (err) {
-    console.error("❌ 오류 발생:", err.message);
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.error(`❌ 오류 발생 (${duration}초 후):`, err.message);
+    throw err;
   } finally {
     client.release();
-    await pool.end();
+    console.log("🔌 데이터베이스 연결 해제 완료");
   }
-})();
+}
+
+module.exports = updateEtfCache;
