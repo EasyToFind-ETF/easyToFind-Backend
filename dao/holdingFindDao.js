@@ -1,3 +1,6 @@
+const path = require("path");
+const fs = require("fs");
+
 const getHoldingFindDao = async (
   Connection,
   query,
@@ -7,6 +10,19 @@ const getHoldingFindDao = async (
   isFavorite,
   userId
 ) => {
+  const isOnlySortWeightPct =
+    sort === "weight_pct" &&
+    !query &&
+    (!assetClass || assetClass === "전체") &&
+    (!theme || theme === "전체");
+
+  if (isOnlySortWeightPct) {
+    const jsonPath = path.join(__dirname, "../data/holdings_none.json");
+    const rawData = fs.readFileSync(jsonPath);
+    const parsed = JSON.parse(rawData);
+    return parsed.data;
+  }
+
   const params = [];
   let sql = `
     SELECT 
