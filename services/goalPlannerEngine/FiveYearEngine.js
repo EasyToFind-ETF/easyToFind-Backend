@@ -1,69 +1,82 @@
 // services/goalPlannerEngine/FiveYearEngine.js
-const { GoalSimEngine } = require("./GoalSimEngine");
-const config = require("../../config/goalPlanner");
-const { getPersonalScoreMap } = require("../../dao/riskMetricsDao");
+const { GoalSimEngine } = require('./GoalSimEngine');
+const config = require('../../config/goalPlanner');
+const { getPersonalScoreMap } = require('../../dao/riskMetricsDao');
 
 class FiveYearEngine extends GoalSimEngine {
   async simulate(input, etfData, connection) {
+    const startTime = Date.now(); // 시작 시간 측정
+
     const {
       targetAmount,
       targetYears,
       initialAmount,
       monthlyContribution,
-      riskProfile, // 이제 userId로 사용
+      riskProfile,
       themePreference,
     } = input;
 
-    const { windowLimit, contributionTiming } = config;
-    const windowSize = targetYears * 12;
-
-    console.log("🧮 시뮬레이션 시작:", {
+    console.log('🧮 Five Year Engine 시작:', {
       etfCount: etfData.length,
-      windowLimit,
-      contributionTiming,
-      userId: riskProfile, // userId로 변경
+      targetAmount,
+      targetYears,
+      initialAmount,
+      monthlyContribution,
     });
 
-    // 1) 개인화 점수 맵 로드 (userId 기반)
+    // 1) 개인화 점수 맵 로드
     const personalMap = await getPersonalScoreMap(connection, riskProfile);
-    console.log(
-      "📊 개인화 점수 맵 로드 완료:",
-      Object.keys(personalMap).length
-    );
+    console.log('📊 개인화 점수 맵 로드 완료:', Object.keys(personalMap).length);
+
+    // 2) 설정값
+    const windowSize = targetYears * 12; // 목표 년수 * 12개월
+    const windowLimit = config.windowLimit; // 최대 윈도우 수
+    const contributionTiming = config.contributionTiming; // 납입 시점
+
+    console.log('⚙️ 설정값:', {
+      windowSize,
+      windowLimit,
+      contributionTiming,
+    });
 
     const results = [];
 
     for (const etf of etfData) {
-      if (etf.prices.length < windowSize) continue;
+      if (etf.prices.length < windowSize) continue; // 최소 데이터 필요
 
-      // 2) 모든 월별 로그수익률 벡터화
-      const monthlyRets = this.toMonthlyLogReturns(etf.prices);
+      console.log(`🔄 ETF 처리 중: ${etf.etf_code} (${etf.etf_name})`);
 
-      // 3) 창 개수 결정 (≤ windowLimit, else full)
-      const maxWin = Math.min(windowLimit, monthlyRets.length - windowSize + 1);
+      // 3) 월별 수익률 계산
+      const monthlyReturns = this.toMonthlyLogReturns(etf.prices);
+      console.log(`📊 ${etf.etf_code} 월별 수익률 계산 완료: ${monthlyReturns.length}개월`);
 
-      let hit = 0;
-      for (let w = 0; w < maxWin; w++) {
-        const sliceRets = monthlyRets.slice(w, w + windowSize);
-        const endVal = this.dcaSim(
-          sliceRets,
+      // 4) 슬라이딩 윈도우 분석
+      const maxWin = Math.min(windowLimit, monthlyReturns.length - windowSize + 1);
+      let successCount = 0;
+
+      for (let i = 0; i < maxWin; i++) {
+        const windowReturns = monthlyReturns.slice(i, i + windowSize);
+        const finalValue = this.dcaSim(
+          windowReturns,
           initialAmount,
           monthlyContribution,
           contributionTiming
         );
 
-        if (endVal >= targetAmount) hit++;
+        if (finalValue >= targetAmount) {
+          successCount++;
+        }
       }
 
-      const hitRate = (hit / maxWin) * 100;
+      // 5) 히트율 계산
+      const hitRate = maxWin > 0 ? (successCount / maxWin) * 100 : 0;
+      console.log(`📈 ${etf.etf_code} 히트율: ${hitRate.toFixed(2)}% (${successCount}/${maxWin})`);
 
-      // 4) 개인화 점수 (기존 위험도 매칭 대체)
+      // 6) 개인화 점수
       const personalScore = personalMap[etf.etf_code] ?? 50; // 기본값 50
 
-      // 5) 최종 점수 계산 (hitRate 70% + personal_score 30%)
-      const goalScore = parseFloat(
-        (hitRate * 0.7 + personalScore * 0.3).toFixed(2)
-      );
+      // 7) 최종 점수 계산 (hitRate 70% + personal_score 30%)
+      const goalScore = parseFloat((hitRate * 0.7 + personalScore * 0.3).toFixed(2));
 
       results.push({
         etf_code: etf.etf_code,
@@ -81,18 +94,21 @@ class FiveYearEngine extends GoalSimEngine {
     results.sort((a, b) => b.goal_score - a.goal_score);
     const topResults = results.slice(0, 10);
 
-    console.log("✅ 시뮬레이션 완료:", results.length, "개 ETF 처리");
+    const endTime = Date.now(); // 종료 시간 측정
+    const calculationTime = ((endTime - startTime) / 1000).toFixed(1); // 초 단위
+
+    console.log('✅ 시뮬레이션 완료:', results.length, '개 ETF 처리');
 
     return {
       recommendations: topResults,
       meta: {
         dataHorizonMonths: config.dataHorizonMonths,
         windowCount: Math.min(windowLimit, 60 - windowSize + 1),
-        reliability: this.getReliabilityLevel(
-          Math.min(windowLimit, 60 - windowSize + 1)
-        ),
+        reliability: this.getReliabilityLevel(Math.min(windowLimit, 60 - windowSize + 1)),
         targetAmount,
         targetYears,
+        calculationTime: `${calculationTime}초`, // 계산 시간 추가
+        confidenceLevel: '90%', // 신뢰수준 추가 (Five Year는 과거 데이터 기반이므로 90%)
         requiredCAGR: this.requiredCagr(
           targetAmount,
           initialAmount,
@@ -108,19 +124,19 @@ class FiveYearEngine extends GoalSimEngine {
     };
   }
 
-  dcaSim(monthlyRets, initialAmt, monthlyContr, timing = "end") {
+  dcaSim(monthlyRets, initialAmt, monthlyContr, timing = 'end') {
     let pv = initialAmt;
 
     monthlyRets.forEach((logRet, idx) => {
       const monthlyReturn = Math.exp(logRet) - 1;
 
-      if (timing === "start") {
+      if (timing === 'start') {
         pv += monthlyContr;
       }
 
       pv *= 1 + monthlyReturn;
 
-      if (timing === "end") {
+      if (timing === 'end') {
         pv += monthlyContr;
       }
     });
@@ -142,9 +158,9 @@ class FiveYearEngine extends GoalSimEngine {
   }
 
   getReliabilityLevel(windowCount) {
-    if (windowCount >= 36) return "high";
-    if (windowCount >= 12) return "medium";
-    return "low";
+    if (windowCount >= 36) return 'high';
+    if (windowCount >= 12) return 'medium';
+    return 'low';
   }
 
   requiredCagr(targetAmount, initialAmount, monthlyContribution, years) {

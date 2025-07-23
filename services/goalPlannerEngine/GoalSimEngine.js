@@ -1,6 +1,6 @@
 class GoalSimEngine {
   async simulate(input, etfData) {
-    throw new Error("simulate method must be implemented");
+    throw new Error('simulate method must be implemented');
   }
 
   vectorCagr(prices) {
@@ -12,8 +12,8 @@ class GoalSimEngine {
     const monthlyReturns = [];
 
     for (let i = 1; i < prices.length; i++) {
-      const prevPrice = prices[i - 1].prices;
-      const currPrice = prices[i].prices;
+      const prevPrice = prices[i - 1].price;
+      const currPrice = prices[i].price;
       const logReturn = Math.log(currPrice / prevPrice);
       monthlyReturns.push(logReturn);
     }
@@ -30,7 +30,7 @@ class GoalSimEngine {
     }
 
     const requiredReturn = targetAmount / totalContribution;
-    const cagr = Math.pow(requiredReturn, 1 / years) - 1;
+    const cagr = requiredReturn ** (1 / years) - 1;
 
     return Math.round(cagr * 100 * 100) / 100;
   }
@@ -39,14 +39,12 @@ class GoalSimEngine {
     let currentAmount = initialAmount;
 
     for (let month = 0; month < months; month++) {
-      const monthlyReturn = Math.pow(1 + cagr, 1 / 12) - 1;
+      const monthlyReturn = (1 + cagr) ** (1 / 12) - 1;
 
-      if (timing === "start") {
-        currentAmount =
-          (currentAmount + monthlyContribution) * (1 + monthlyReturn);
+      if (timing === 'start') {
+        currentAmount = (currentAmount + monthlyContribution) * (1 + monthlyReturn);
       } else {
-        currentAmount =
-          currentAmount * (1 + monthlyReturn) + monthlyContribution;
+        currentAmount = currentAmount * (1 + monthlyReturn) + monthlyContribution;
       }
     }
     return currentAmount;
