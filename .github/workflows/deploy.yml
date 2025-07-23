@@ -21,7 +21,7 @@ jobs:
     - name: Deploy Backend to EC2
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} -p ${{ secrets.EC2_PORT }} << 'EOF'
-          cd /home/ec2-user/easyToFind-Frontend
+          cd /home/ec2-user/easyToFind-Backend
 
           echo "DB_HOST=${{ secrets.DB_HOST }}" > .env
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
@@ -33,7 +33,6 @@ jobs:
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
           
           git pull origin main
-          pnpm install
-          pnpm build
-          pm2 restart easytofind-frontend
+          npm install
+          pm2 restart easytofind-backend
         EOF
