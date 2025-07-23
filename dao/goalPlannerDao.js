@@ -30,14 +30,14 @@ const getGoalPlanDao = async (connection, etfLimit) => {
     GROUP BY te.etf_code, te.etf_name, te.asset_class, te.theme
   `;
 
-  console.log("🗄️ DAO: SQL 쿼리 실행, etfLimit:", etfLimit);
+  console.log('🗄️ DAO: SQL 쿼리 실행, etfLimit:', etfLimit);
 
   const { rows } = await connection.query(sql, [etfLimit]);
-  console.log("️ DAO: 조회된 ETF 수:", rows.length);
+  console.log('️ DAO: 조회된 ETF 수:', rows.length);
 
   // JSON 파싱하여 반환
   const result = rows.map((r) => r.etf_json);
-  console.log("🗄️ DAO: 파싱 완료, 반환할 ETF 수:", result.length);
+  console.log('🗄️ DAO: 파싱 완료, 반환할 ETF 수:', result.length);
 
   return result;
 };
