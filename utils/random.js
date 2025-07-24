@@ -38,6 +38,16 @@ function normalPair(rng) {
 }
 
 /**
+ * Box-Muller 변환을 사용한 정규분포 난수 생성
+ * @param {function} rng - 난수 생성 함수
+ * @returns {number} 표준정규분포 난수
+ */
+function rngNormal(rng) {
+  const { z0 } = normalPair(rng);
+  return z0;
+}
+
+/**
  * t-분포 난수 생성 (fat-tail 현상 대응)
  * @param {number} df - 자유도 (degrees of freedom)
  * @param {function} rng - 난수 생성 함수
@@ -198,7 +208,8 @@ function testRandomQuality(rng, samples = 10000) {
   const mean = values.reduce((sum, val) => sum + val, 0) / samples;
 
   // 분산
-  const variance = values.reduce((sum, val) => sum + (val - mean) ** 2, 0) / samples;
+  const variance =
+    values.reduce((sum, val) => sum + (val - mean) ** 2, 0) / samples;
 
   // 연속성 테스트 (연속된 값들의 상관관계)
   let autocorrelation = 0;
@@ -232,15 +243,19 @@ function testNormalQuality(rng, samples = 10000) {
   }
 
   const mean = values.reduce((sum, val) => sum + val, 0) / samples;
-  const variance = values.reduce((sum, val) => sum + (val - mean) ** 2, 0) / samples;
+  const variance =
+    values.reduce((sum, val) => sum + (val - mean) ** 2, 0) / samples;
 
   // 왜도 (skewness)
   const skewness =
-    values.reduce((sum, val) => sum + (val - mean) ** 3, 0) / (samples * variance ** 1.5);
+    values.reduce((sum, val) => sum + (val - mean) ** 3, 0) /
+    (samples * variance ** 1.5);
 
   // 첨도 (kurtosis)
   const kurtosis =
-    values.reduce((sum, val) => sum + (val - mean) ** 4, 0) / (samples * variance ** 2) - 3;
+    values.reduce((sum, val) => sum + (val - mean) ** 4, 0) /
+      (samples * variance ** 2) -
+    3;
 
   return {
     mean,
@@ -258,6 +273,7 @@ function testNormalQuality(rng, samples = 10000) {
 module.exports = {
   createSeededRng,
   normalPair,
+  rngNormal,
   tStudent,
   exponential,
   gamma,

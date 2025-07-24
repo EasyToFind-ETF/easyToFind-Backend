@@ -1,6 +1,6 @@
 class GoalSimEngine {
   async simulate(input, etfData) {
-    throw new Error('simulate method must be implemented');
+    throw new Error("simulate method must be implemented");
   }
 
   vectorCagr(prices) {
@@ -25,14 +25,23 @@ class GoalSimEngine {
     const totalMonths = years * 12;
     const totalContribution = initialAmount + monthlyContribution * totalMonths;
 
+    // 목표 금액이 총 투자금보다 작거나 같은 경우
     if (totalContribution >= targetAmount) {
+      // 목표 금액이 총 투자금보다 작은 경우 음수 수익률 반환
+      if (totalContribution > targetAmount) {
+        const requiredReturn = targetAmount / totalContribution;
+        const cagr = requiredReturn ** (1 / years) - 1;
+        return parseFloat((cagr * 100).toFixed(1));
+      }
+      // 목표 금액이 총 투자금과 같은 경우 0% 반환
       return 0;
     }
 
+    // 목표 금액이 총 투자금보다 큰 경우 양수 수익률 계산
     const requiredReturn = targetAmount / totalContribution;
     const cagr = requiredReturn ** (1 / years) - 1;
 
-    return Math.round(cagr * 100 * 100) / 100;
+    return parseFloat((cagr * 100).toFixed(1));
   }
 
   dcaSim(cagr, months, initialAmount, monthlyContribution, timing) {
@@ -41,10 +50,12 @@ class GoalSimEngine {
     for (let month = 0; month < months; month++) {
       const monthlyReturn = (1 + cagr) ** (1 / 12) - 1;
 
-      if (timing === 'start') {
-        currentAmount = (currentAmount + monthlyContribution) * (1 + monthlyReturn);
+      if (timing === "start") {
+        currentAmount =
+          (currentAmount + monthlyContribution) * (1 + monthlyReturn);
       } else {
-        currentAmount = currentAmount * (1 + monthlyReturn) + monthlyContribution;
+        currentAmount =
+          currentAmount * (1 + monthlyReturn) + monthlyContribution;
       }
     }
     return currentAmount;

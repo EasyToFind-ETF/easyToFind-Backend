@@ -32,8 +32,18 @@ function std(arr) {
   }
 
   const avg = mean(arr);
-  const variance = arr.reduce((acc, val) => acc + (val - avg) ** 2, 0) / arr.length;
+  const variance =
+    arr.reduce((acc, val) => acc + (val - avg) ** 2, 0) / arr.length;
   return Math.sqrt(variance);
+}
+
+/**
+ * 표준편차 계산 (stdDev 별칭)
+ * @param {Array<number>} arr - 숫자 배열
+ * @returns {number} 표준편차
+ */
+function stdDev(arr) {
+  return std(arr);
 }
 
 /**
@@ -87,6 +97,7 @@ function sharpeRatio(avg, stdev, rf = 0.02) {
  * VaR (Value at Risk) 및 CVaR (Conditional VaR) 계산
  * @param {Array<number>} arr - 수익률 또는 포트폴리오 가치 배열
  * @param {number} alpha - 신뢰수준 (기본값: 0.95)
+ *                        alpha=0.95 → VaR은 5% 백분위수
  * @returns {object} { var, cvar }
  */
 function varCvar(arr, alpha = 0.95) {
@@ -95,6 +106,7 @@ function varCvar(arr, alpha = 0.95) {
   }
 
   // VaR 계산 (1-alpha 백분위수)
+  // 예: alpha=0.95 → varPercentile=0.05 (5% 백분위수)
   const varPercentile = 1 - alpha;
   const varValue = percentile(arr, varPercentile);
 
@@ -147,7 +159,8 @@ function skewness(arr) {
   }
 
   const n = arr.length;
-  const skew = arr.reduce((acc, val) => acc + ((val - avg) / stdev) ** 3, 0) / n;
+  const skew =
+    arr.reduce((acc, val) => acc + ((val - avg) / stdev) ** 3, 0) / n;
 
   return skew;
 }
@@ -170,7 +183,8 @@ function kurtosis(arr) {
   }
 
   const n = arr.length;
-  const kurt = arr.reduce((acc, val) => acc + ((val - avg) / stdev) ** 4, 0) / n - 3;
+  const kurt =
+    arr.reduce((acc, val) => acc + ((val - avg) / stdev) ** 4, 0) / n - 3;
 
   return kurt;
 }
@@ -238,9 +252,17 @@ function calculateReturns(prices) {
 
 /**
  * 연간화된 통계 계산
- * @param {Array<number>} returns - 수익률 배열
+ * @param {Array<number>} returns - 수익률 배열 (로그 수익률 또는 단순 수익률)
  * @param {number} periodsPerYear - 연간 기간 수 (예: 252일, 12개월)
  * @returns {object} 연간화된 통계
+ *
+ * 연간화 방법:
+ * - 수익률: avgReturn * periodsPerYear (선형 스케일링)
+ * - 변동성: volatility * Math.sqrt(periodsPerYear) (제곱근 스케일링)
+ *
+ * 수학적 근거:
+ * - 수익률: 독립적 사건의 경우 선형 가법성
+ * - 변동성: 분산의 가법성으로 인한 제곱근 스케일링
  */
 function annualizeStats(returns, periodsPerYear = 252) {
   if (!Array.isArray(returns) || returns.length === 0) {
@@ -256,7 +278,10 @@ function annualizeStats(returns, periodsPerYear = 252) {
 
   const annualizedReturn = avgReturn * periodsPerYear;
   const annualizedVolatility = volatility * Math.sqrt(periodsPerYear);
-  const annualizedSharpeRatio = sharpeRatio(annualizedReturn, annualizedVolatility);
+  const annualizedSharpeRatio = sharpeRatio(
+    annualizedReturn,
+    annualizedVolatility
+  );
 
   return {
     annualizedReturn,
@@ -272,7 +297,12 @@ function annualizeStats(returns, periodsPerYear = 252) {
  * @returns {number} 피어슨 상관계수
  */
 function correlation(x, y) {
-  if (!Array.isArray(x) || !Array.isArray(y) || x.length !== y.length || x.length < 2) {
+  if (
+    !Array.isArray(x) ||
+    !Array.isArray(y) ||
+    x.length !== y.length ||
+    x.length < 2
+  ) {
     return 0;
   }
 
@@ -363,10 +393,41 @@ function summaryStats(arr) {
   };
 }
 
+/**
+ * Wilson score interval (two-sided)
+ * @param {number} successes - 성공 횟수
+ * @param {number} n         - 전체 시뮬레이션 횟수
+ * @param {number} z         - Z-value (95%=>1.96, 90%=>1.645 등)
+ * @returns {{low:number, mid:number, high:number}} 0~100 [%] 단위
+ *
+ * 수학적 근거:
+ * - 이항분포의 정확한 신뢰구간 계산
+ * - 정규근사보다 정확한 결과 (특히 극단값에서)
+ * - 0~100% 범위 보장
+ */
+function wilsonCI(successes, n, z = 1.96) {
+  if (n === 0) return { low: 0, mid: 0, high: 0 };
+
+  const p = successes / n;
+  const denom = 1 + z ** 2 / n;
+  const centre = p + z ** 2 / (2 * n);
+  const margin = z * Math.sqrt((p * (1 - p) + z ** 2 / (4 * n)) / n);
+
+  const low = Math.max(0, (centre - margin) / denom);
+  const high = Math.min(1, (centre + margin) / denom);
+
+  return {
+    low: low * 100,
+    mid: p * 100,
+    high: high * 100,
+  };
+}
+
 // 모듈 내보내기
 module.exports = {
   mean,
   std,
+  stdDev,
   percentile,
   sharpeRatio,
   varCvar,
@@ -379,6 +440,7 @@ module.exports = {
   correlation,
   confidenceInterval,
   summaryStats,
+  wilsonCI,
 };
 
 // 사용 예시 (주석 처리)
