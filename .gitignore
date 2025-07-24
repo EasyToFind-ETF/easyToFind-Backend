@@ -22,3 +22,5 @@ out/
 # IDE and editor directories
 .vscode/
 .idea/
+
+dayoung-ec2-key1.pem
