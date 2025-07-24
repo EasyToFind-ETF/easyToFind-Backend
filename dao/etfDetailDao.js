@@ -151,12 +151,20 @@ const getEtfRecommendationScoreDao = async (etfCode) => {
                 etf_code,
                 group_id,
                 detail,
-                etf_score,
                 mdd,
                 volatility,
                 return_1y,
                 latest_aum,
-                expense_ratio
+                expense_ratio,
+                etf_score,
+                stability_risk_score,
+                stability_score,
+                liquidity_score,
+                growth_score,
+                diversification_score,
+                aum_score,
+                mdd_score,
+                dif_score
             FROM etf_recommendation_score
             WHERE etf_code = $1
             ORDER BY base_date DESC
