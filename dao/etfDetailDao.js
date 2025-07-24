@@ -1,10 +1,10 @@
 const pool = require("../common/database");
 
 const getEtfDetailDao = async (etfCode) => {
-    try {
-        console.log(`[DAO] getEtfDetailDao called with etfCode: ${etfCode}`);
+  try {
+    console.log(`[DAO] getEtfDetailDao called with etfCode: ${etfCode}`);
 
-        const query = `
+    const query = `
             SELECT 
                 e.etf_code,
                 e.etf_name,
@@ -44,27 +44,27 @@ const getEtfDetailDao = async (etfCode) => {
             ORDER BY p.trade_date DESC
         `;
 
-        console.log(`[DAO] Executing query with parameter: ${etfCode}`);
-        const result = await pool.query(query, [etfCode]);
-        console.log(`[DAO] Query result: ${result.rows.length} rows found`);
+    console.log(`[DAO] Executing query with parameter: ${etfCode}`);
+    const result = await pool.query(query, [etfCode]);
+    console.log(`[DAO] Query result: ${result.rows.length} rows found`);
 
-        if (result.rows.length === 0) {
-            console.log(`[DAO] No data found for ETF code: ${etfCode}`);
-            return null;
-        }
-
-        console.log(`[DAO] First row sample:`, result.rows[0]);
-        return result.rows;
-    } catch (error) {
-        console.error("ETF 상세 정보 조회 DAO 에러:", error);
-        throw error;
+    if (result.rows.length === 0) {
+      console.log(`[DAO] No data found for ETF code: ${etfCode}`);
+      return null;
     }
+
+    console.log(`[DAO] First row sample:`, result.rows[0]);
+    return result.rows;
+  } catch (error) {
+    console.error("ETF 상세 정보 조회 DAO 에러:", error);
+    throw error;
+  }
 };
 
 const getEtfYieldDao = async (etfCode) => {
-    try {
-        // etf_return_cache 테이블에서 미리 계산된 수익률 데이터 조회
-        const query = `
+  try {
+    // etf_return_cache 테이블에서 미리 계산된 수익률 데이터 조회
+    const query = `
             SELECT 
                 etf_code,
                 etf_name,
@@ -82,26 +82,26 @@ const getEtfYieldDao = async (etfCode) => {
             WHERE etf_code = $1
         `;
 
-        const result = await pool.query(query, [etfCode]);
+    const result = await pool.query(query, [etfCode]);
 
-        if (result.rows.length === 0) {
-            return null;
-        }
-
-        return result.rows[0];
-    } catch (error) {
-        console.error("ETF 수익률 데이터 조회 DAO 에러:", error);
-        throw error;
+    if (result.rows.length === 0) {
+      return null;
     }
+
+    return result.rows[0];
+  } catch (error) {
+    console.error("ETF 수익률 데이터 조회 DAO 에러:", error);
+    throw error;
+  }
 };
 
 const getEtfHoldingsDao = async (etfCode, date = null) => {
-    try {
-        console.log(`Fetching holdings data for ETF: ${etfCode}`);
+  try {
+    console.log(`Fetching holdings data for ETF: ${etfCode}`);
 
-        // etfs + etf_holdings + stock 조인
-        // SUBSTRING(s.holding_code FROM 4 FOR 6) as stock_code, 부분 고려해야 함
-        let query = `
+    // etfs + etf_holdings + stock 조인
+    // SUBSTRING(s.holding_code FROM 4 FOR 6) as stock_code, 부분 고려해야 함
+    let query = `
             SELECT 
                 e.etf_code,
                 e.etf_name,
@@ -117,35 +117,38 @@ const getEtfHoldingsDao = async (etfCode, date = null) => {
             WHERE e.etf_code = $1
         `;
 
-        let params = [etfCode];
+    let params = [etfCode];
 
-        // 모든 holdings 데이터 조회 (날짜 필터링 제거)
-        query += ` ORDER BY h.weight_pct DESC`;
+    // 모든 holdings 데이터 조회 (날짜 필터링 제거)
+    query += ` ORDER BY h.weight_pct DESC`;
 
-        console.log('Executing JOIN query with params:', params);
-        const result = await pool.query(query, params);
+    console.log("Executing JOIN query with params:", params);
+    const result = await pool.query(query, params);
 
-        if (result.rows.length === 0) {
-            console.log(`No holdings data found for ETF code: ${etfCode}`);
-            return [];
-        }
-
-        console.log(`Found ${result.rows.length} holdings records for ETF: ${etfCode}`);
-        console.log('Sample holdings data:', result.rows[0]);
-
-        return result.rows;
-
-    } catch (error) {
-        console.error("ETF 보유 종목 데이터 조회 DAO 에러:", error);
-        throw error;
+    if (result.rows.length === 0) {
+      console.log(`No holdings data found for ETF code: ${etfCode}`);
+      return [];
     }
+
+    console.log(
+      `Found ${result.rows.length} holdings records for ETF: ${etfCode}`
+    );
+    console.log("Sample holdings data:", result.rows[0]);
+
+    return result.rows;
+  } catch (error) {
+    console.error("ETF 보유 종목 데이터 조회 DAO 에러:", error);
+    throw error;
+  }
 };
 
 const getEtfRecommendationScoreDao = async (etfCode) => {
-    try {
-        console.log(`[DAO] getEtfRecommendationScoreDao called with etfCode: ${etfCode}`);
+  try {
+    console.log(
+      `[DAO] getEtfRecommendationScoreDao called with etfCode: ${etfCode}`
+    );
 
-        const query = `
+    const query = `
             SELECT 
                 base_date,
                 etf_code,
@@ -171,26 +174,32 @@ const getEtfRecommendationScoreDao = async (etfCode) => {
             LIMIT 1
         `;
 
-        console.log(`[DAO] Executing recommendation score query with parameter: ${etfCode}`);
-        const result = await pool.query(query, [etfCode]);
-        console.log(`[DAO] Recommendation score query result: ${result.rows.length} rows found`);
+    console.log(
+      `[DAO] Executing recommendation score query with parameter: ${etfCode}`
+    );
+    const result = await pool.query(query, [etfCode]);
+    console.log(
+      `[DAO] Recommendation score query result: ${result.rows.length} rows found`
+    );
 
-        if (result.rows.length === 0) {
-            console.log(`[DAO] No recommendation score data found for ETF code: ${etfCode}`);
-            return null;
-        }
-
-        console.log(`[DAO] Recommendation score data:`, result.rows[0]);
-        return result.rows[0];
-    } catch (error) {
-        console.error("ETF 추천 점수 데이터 조회 DAO 에러:", error);
-        throw error;
+    if (result.rows.length === 0) {
+      console.log(
+        `[DAO] No recommendation score data found for ETF code: ${etfCode}`
+      );
+      return null;
     }
+
+    console.log(`[DAO] Recommendation score data:`, result.rows[0]);
+    return result.rows[0];
+  } catch (error) {
+    console.error("ETF 추천 점수 데이터 조회 DAO 에러:", error);
+    throw error;
+  }
 };
 
 module.exports = {
-    getEtfDetailDao,
-    getEtfYieldDao,
-    getEtfHoldingsDao,
-    getEtfRecommendationScoreDao,
+  getEtfDetailDao,
+  getEtfYieldDao,
+  getEtfHoldingsDao,
+  getEtfRecommendationScoreDao,
 };

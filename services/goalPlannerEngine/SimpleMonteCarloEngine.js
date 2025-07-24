@@ -266,6 +266,15 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     // 데이터베이스에서 실제 변동성과 최대낙폭 값 가져오기
     const recommendationData = await getEtfRecommendationScoreDao(etf.etf_code);
 
+    // 디버깅: recommendationData 확인
+    console.log(`🔍 ${etf.etf_code} recommendationData:`, {
+      hasData: !!recommendationData,
+      stability_score: recommendationData?.stability_score,
+      liquidity_score: recommendationData?.liquidity_score,
+      growth_score: recommendationData?.growth_score,
+      diversification_score: recommendationData?.diversification_score,
+    });
+
     const dbVolatility = recommendationData?.volatility || 0.15; // 기본값 15%
     const dbMaxDrawdown = recommendationData?.mdd || 0.3; // 기본값 30%
 
@@ -315,7 +324,9 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
       initialAmount, // initialInvestment
       targetYears, // targetYears
       monthlyContribution, // monthlyContribution
-      finalMaxDrawdown // 데이터베이스 최대낙폭 사용
+      finalMaxDrawdown, // 데이터베이스 최대낙폭 사용
+      dbVolatility, // DB에서 가져온 변동성
+      recommendationData?.sharpe_ratio // DB에서 가져온 샤프비율
     );
 
     // 개별 ETF 성공률 신뢰구간 계산 (Wilson CI 방식)
@@ -328,18 +339,32 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     const fanBands = this.buildFanBands(monthlyPaths);
     const { representative, randomSamples } = this.selectRepresentativePaths(
       monthlyPaths,
-      finalValues
+      finalValues,
+      etf.etf_code,
+      userId
     );
     const principalLine = this.calculatePrincipalLine(
       initialAmount,
       monthlyContribution,
-      targetYears * 12
+      targetYears * 12 + 1 // 초기값 포함
+    );
+
+    // 그래프 데이터 최적화 적용
+    const optimizedGraphData = this.optimizeGraphData(
+      monthlyPaths,
+      fanBands,
+      representative,
+      randomSamples,
+      principalLine
     );
 
     // 디버깅: 시뮬레이션 결과 확인
     console.log(`🔍 ${etf.etf_code} 시뮬레이션 결과:`, {
       baseReturn: baseReturn.toFixed(4),
       finalVolatility: finalVolatility.toFixed(4),
+      dbVolatility: dbVolatility?.toFixed(4),
+      dbSharpeRatio: recommendationData?.sharpe_ratio?.toFixed(4),
+      dbMaxDrawdown: finalMaxDrawdown?.toFixed(4),
       simulations: config.simulations,
       finalValuesRange: {
         min: Math.min(...finalValues).toLocaleString(),
@@ -354,7 +379,15 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
       },
     });
 
-    return {
+    // 개인화 점수 상세 정보 생성
+    const personalScoreDetails = {
+      stability: recommendationData?.stability_score || 50,
+      liquidity: recommendationData?.liquidity_score || 50,
+      growth: recommendationData?.growth_score || 50,
+      diversification: recommendationData?.diversification_score || 50,
+    };
+
+    const result = {
       etf_code: etf.etf_code,
       etf_name: etf.etf_name,
       asset_class: etf.asset_class,
@@ -377,24 +410,33 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
       ), // 퍼센트, 소수점 첫째자리
       market_regime: marketRegime,
       simulation_count: config.simulations,
-      // 새로운 월별 경로 데이터 구조
-      monthly_paths: {
-        representative: {
-          p95: representative.p95, // 최고 성과 경로
-          p50: representative.p50, // 중앙값 경로
-          p05: representative.p05, // 최악 성과 경로
-        },
-        random_samples: randomSamples, // 랜덤 샘플 2개
-        fan_bands: fanBands, // 분위수 밴드
-        principal_line: principalLine, // 원금 누적선
-        x_axis: {
-          type: "monthIndex",
-          length: targetYears * 12,
-          labels: Array.from(
-            { length: targetYears * 12 },
-            (_, i) => `${Math.floor(i / 12)}년 ${(i % 12) + 1}월`
-          ),
-        },
+      // 개인화 점수 상세 정보 추가
+      personal_score_details: personalScoreDetails,
+      // 최적화된 월별 경로 데이터 구조 - 명시적으로 monthly_paths 필드로 전달
+      monthly_paths: optimizedGraphData.monthly_paths,
+      x_axis: {
+        type: "monthIndex",
+        length: optimizedGraphData.monthly_paths.representative.p95.length,
+        labels: Array.from(
+          {
+            length: optimizedGraphData.monthly_paths.representative.p95.length,
+          },
+          (_, i) => {
+            if (i === 0) return "시작";
+            const monthIndex =
+              (i * (targetYears * 12 + 1)) /
+              optimizedGraphData.monthly_paths.representative.p95.length;
+            return `${Math.floor((monthIndex - 1) / 12)}년 ${((monthIndex - 1) % 12) + 1}월`;
+          }
+        ),
+      },
+      meta: {
+        months: optimizedGraphData.monthly_paths.representative.p95.length,
+        simulations: config.simulations,
+        contribution_timing: "end",
+        downsampled:
+          optimizedGraphData.monthly_paths.representative.p95.length <
+          targetYears * 12 + 1,
       },
       confidence_interval: {
         low: parseFloat(low.toFixed(1)),
@@ -402,6 +444,17 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
         high: parseFloat(high.toFixed(1)),
       },
     };
+
+    // 검증 실행 (개발 환경에서만)
+    if (process.env.NODE_ENV === "development") {
+      this.validateGraphDataStructure({
+        monthly_paths: optimizedGraphData.monthly_paths,
+        x_axis: result.x_axis,
+        meta: result.meta,
+      });
+    }
+
+    return result;
   }
 
   // ETF 메트릭 계산 (10줄 이하 함수)
@@ -966,41 +1019,154 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
   }
 
   // 대표 경로 선택 (최고/중앙/최악 + 랜덤)
-  selectRepresentativePaths(monthlyPaths, finalValues) {
+  selectRepresentativePaths(monthlyPaths, finalValues, etfCode, userId) {
     const pairs = finalValues.map((v, i) => ({ value: v, index: i }));
-    const sortedPairs = pairs.sort((a, b) => b.value - a.value);
+    const sortedPairs = pairs.sort((a, b) => b.value - a.value); // 내림차순 정렬
 
     const n = monthlyPaths.length;
-    const p95Index = Math.floor(n * 0.05); // 상위 5%
-    const p50Index = Math.floor(n * 0.5); // 중앙값
-    const p05Index = Math.floor(n * 0.95); // 하위 5%
+    const p95Index = Math.floor(n * 0.05); // 상위 5% (최고 성과)
+    const p05Index = Math.floor(n * 0.95); // 하위 5% (최악 성과)
 
     const representative = {
       p95: monthlyPaths[sortedPairs[p95Index].index], // 최고 성과
-      p50: monthlyPaths[sortedPairs[p50Index].index], // 중앙값
       p05: monthlyPaths[sortedPairs[p05Index].index], // 최악 성과
+      // p50은 fan_bands.p50 사용 (실제 경로 대신)
     };
 
-    // 랜덤 샘플 2개 선택
-    const randomIndices = [];
-    while (randomIndices.length < 2) {
-      const randomIndex = Math.floor(Math.random() * n);
-      if (!randomIndices.includes(randomIndex)) {
-        randomIndices.push(randomIndex);
-      }
-    }
-
-    const randomSamples = randomIndices.map((i) => monthlyPaths[i]);
+    // 재현 가능한 랜덤 샘플 2개 선택
+    const randomSamples = this.selectRandomSamples(
+      monthlyPaths,
+      etfCode,
+      userId
+    );
 
     return { representative, randomSamples };
   }
 
-  // 원금 누적선 계산
+  // 재현 가능한 랜덤 샘플 선택
+  selectRandomSamples(monthlyPaths, etfCode, userId) {
+    const seed = this.generateSeed(etfCode, userId) + 999; // 랜덤 샘플용 별도 시드
+    const rng = createSeededRng(seed);
+
+    const n = monthlyPaths.length;
+    const indices = [];
+
+    while (indices.length < 2) {
+      const randomIndex = Math.floor(rng() * n);
+      if (!indices.includes(randomIndex)) {
+        indices.push(randomIndex);
+      }
+    }
+
+    return indices.map((i) => monthlyPaths[i]);
+  }
+
+  // 원금 누적선 계산 (초기값 포함)
   calculatePrincipalLine(initialAmount, monthlyContribution, months) {
-    return Array.from(
-      { length: months },
-      (_, i) => initialAmount + monthlyContribution * i
+    return Array.from({ length: months }, (_, i) => {
+      if (i === 0) return initialAmount; // 0번째 = 초기값
+      return initialAmount + monthlyContribution * i; // 1번째부터 월 납입액 누적
+    });
+  }
+
+  // 성능 최적화를 위한 다운샘플링
+  downsampleArray(arr, targetLength = 24) {
+    if (arr.length <= targetLength) return arr;
+
+    const sampleRate = Math.ceil(arr.length / targetLength);
+    return arr.filter((_, i) => i % sampleRate === 0);
+  }
+
+  // 그래프 데이터 최적화
+  optimizeGraphData(
+    monthlyPaths,
+    fanBands,
+    representative,
+    randomSamples,
+    principalLine
+  ) {
+    const totalMonths = monthlyPaths[0].length;
+    const shouldDownsample = totalMonths > 60;
+
+    if (!shouldDownsample) {
+      return {
+        monthly_paths: {
+          representative,
+          random_samples: randomSamples,
+          fan_bands: fanBands,
+          principal_line: principalLine,
+        },
+      };
+    }
+
+    // 다운샘플링 적용
+    const downsampledRepresentative = {
+      p95: this.downsampleArray(representative.p95),
+      p05: this.downsampleArray(representative.p05),
+    };
+
+    const downsampledRandomSamples = randomSamples.map((path) =>
+      this.downsampleArray(path)
     );
+
+    const downsampledFanBands = {};
+    Object.keys(fanBands).forEach((key) => {
+      downsampledFanBands[key] = this.downsampleArray(fanBands[key]);
+    });
+
+    const downsampledPrincipalLine = this.downsampleArray(principalLine);
+
+    return {
+      monthly_paths: {
+        representative: downsampledRepresentative,
+        random_samples: downsampledRandomSamples,
+        fan_bands: downsampledFanBands,
+        principal_line: downsampledPrincipalLine,
+      },
+    };
+  }
+
+  // 수정된 코드 검증을 위한 테스트 함수
+  validateGraphDataStructure(graphData) {
+    const { monthly_paths, x_axis, meta } = graphData;
+
+    // 기본 구조 검증
+    if (!monthly_paths || !x_axis || !meta) {
+      console.error("❌ 필수 구조 누락");
+      return false;
+    }
+
+    // 대표 경로 검증
+    const { representative, random_samples, fan_bands, principal_line } =
+      monthly_paths;
+    if (!representative.p95 || !representative.p05) {
+      console.error("❌ 대표 경로 누락");
+      return false;
+    }
+
+    // 길이 일관성 검증
+    const expectedLength = x_axis.length;
+    const paths = [
+      representative.p95,
+      representative.p05,
+      ...random_samples,
+      ...Object.values(fan_bands),
+      principal_line,
+    ];
+
+    const inconsistentPaths = paths.filter(
+      (path) => path.length !== expectedLength
+    );
+    if (inconsistentPaths.length > 0) {
+      console.error("❌ 길이 일관성 오류:", {
+        expected: expectedLength,
+        actual: inconsistentPaths.map((p) => p.length),
+      });
+      return false;
+    }
+
+    console.log("✅ 그래프 데이터 구조 검증 통과");
+    return true;
   }
 }
 
