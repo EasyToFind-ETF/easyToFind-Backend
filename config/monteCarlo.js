@@ -9,14 +9,14 @@
 
 const monteCarloConfig = {
   // === 기본 시뮬레이션 설정 ===
-  simulations: 2000, // 기본 경로 수 (정확도 vs 성능 균형)
+  simulations: 5000, // 기본 경로 수 (정확도 vs 성능 균형)
   riskFreeRate: 0.02, // 무위험 수익률 (연 2%)
   maxMonthlyMove: 0.25, // 월별 수익률 소프트 캡 기준 (±25% 이상은 점차 포화)
   tailDf: 5, // t-분포 자유도 (fat-tail 현상 대응)
 
   // === 기본 시스템 설정 ===
   dataHorizonMonths: 60, // 데이터 수집 기간 (5년)
-  etfLimit: 900, // 시가총액 상위 ETF 수
+  etfLimit: 992, // 시가총액 상위 ETF 수
   maxYears: 5, // 최대 투자 기간
   contributionTiming: "end", // 납입 시점 (start/end)
 
@@ -110,7 +110,7 @@ const monteCarloConfig = {
   // === 환경별 설정 오버라이드 ===
   environments: {
     development: {
-      simulations: 2000, // 모든 환경에서 2000개로 통일
+      simulations: 5000, // 개발 환경: 빠른 테스트
       enableLogs: true,
       debugging: {
         enableLogs: true,
@@ -118,14 +118,14 @@ const monteCarloConfig = {
       },
     },
     testing: {
-      simulations: 2000, // 모든 환경에서 2000개로 통일
+      simulations: 5000, // 테스트 환경: 충분한 검증
       random: {
         defaultSeed: 42, // 테스트용 고정 시드
         enableSeededRng: true,
       },
     },
     production: {
-      simulations: 2000, // 모든 환경에서 2000개로 통일
+      simulations: 5000, // 운영 환경: 정확도와 성능 균형
       enableLogs: false,
       performance: {
         enableParallel: true,

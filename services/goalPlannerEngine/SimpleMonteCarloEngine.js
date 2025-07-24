@@ -108,13 +108,6 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
           r.personal_score,
           r.riskAdjustedScore
         );
-
-        console.log(`📈 ${r.etf_code} Sharpe 정규화:`, {
-          original: r.sharpe_ratio.toFixed(4),
-          zScore: z.toFixed(4),
-          normalized: r.riskAdjustedScore.toFixed(2),
-          newGoalScore: r.goal_score.toFixed(2),
-        });
       });
     } else {
       console.warn(
@@ -273,15 +266,6 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     // 데이터베이스에서 실제 변동성과 최대낙폭 값 가져오기
     const recommendationData = await getEtfRecommendationScoreDao(etf.etf_code);
 
-    // 데이터베이스 조회 결과 디버깅
-    console.log(`🔍 ${etf.etf_code} DB 조회 결과:`, {
-      hasData: !!recommendationData,
-      rawData: recommendationData,
-      volatility: recommendationData?.volatility,
-      mdd: recommendationData?.mdd,
-      baseDate: recommendationData?.base_date,
-    });
-
     const dbVolatility = recommendationData?.volatility || 0.15; // 기본값 15%
     const dbMaxDrawdown = recommendationData?.mdd || 0.3; // 기본값 30%
 
@@ -296,19 +280,6 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
 
     const seed = this.generateSeed(etf.etf_code, userId);
     const rng = createSeededRng(seed);
-
-    console.log(`🔍 ${etf.etf_code} 시뮬레이션 시작:`, {
-      baseReturn: baseReturn.toFixed(4),
-      volatility: volatility.toFixed(4),
-      dbVolatility: (dbVolatility * 100).toFixed(2) + "%",
-      dbMaxDrawdown: (dbMaxDrawdown * 100).toFixed(2) + "%",
-      volatilityMonth: (finalVolatility / Math.sqrt(12)).toFixed(4),
-      ratio: Math.sqrt(12).toFixed(2),
-      marketRegime,
-      targetAmount,
-      initialAmount,
-      monthlyContribution,
-    });
 
     // 시뮬레이션 실행
     const simulationResults = Array.from({ length: config.simulations }, () =>
@@ -327,9 +298,18 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     // 통계 계산
     const finalValues = simulationResults.map((r) => r.finalValue);
     const monthlyPaths = simulationResults.map((r) => r.monthlyValues);
+
+    // 최종 가치 기준으로 상위 5개 경로 선택
+    const pairs = finalValues.map((v, i) => ({ value: v, index: i }));
+    const topIndices = pairs
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
+      .map((p) => p.index);
+    const topMonthlyPaths = topIndices.map((i) => monthlyPaths[i]);
+
     const analysis = this.calculateStatistics(
       finalValues,
-      monthlyPaths,
+      topMonthlyPaths, // 상위 5개 경로 사용
       targetAmount,
       config,
       initialAmount, // initialInvestment
@@ -344,17 +324,34 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     );
     const { low, mid, high } = wilsonCI(successCount, config.simulations);
 
-    console.log(`📊 ${etf.etf_code} 분석 결과:`, {
-      successRate: analysis.successRate.toFixed(2) + "%",
-      confidenceInterval: `${low.toFixed(1)}% - ${high.toFixed(1)}%`,
-      expectedValue: Math.round(analysis.expectedValue).toLocaleString(),
-      volatility: (analysis.volatility * 100).toFixed(2) + "%",
-      dbVolatilityUsed: (dbVolatility * 100).toFixed(2) + "%",
-      maxDrawdown: (analysis.maxDrawdown * 100).toFixed(2) + "%",
-      dbMaxDrawdownUsed: (dbMaxDrawdown * 100).toFixed(2) + "%",
-      finalValuesCount: finalValues.length,
-      minValue: Math.min(...finalValues).toLocaleString(),
-      maxValue: Math.max(...finalValues).toLocaleString(),
+    // Fan Bands 및 대표 경로 계산
+    const fanBands = this.buildFanBands(monthlyPaths);
+    const { representative, randomSamples } = this.selectRepresentativePaths(
+      monthlyPaths,
+      finalValues
+    );
+    const principalLine = this.calculatePrincipalLine(
+      initialAmount,
+      monthlyContribution,
+      targetYears * 12
+    );
+
+    // 디버깅: 시뮬레이션 결과 확인
+    console.log(`🔍 ${etf.etf_code} 시뮬레이션 결과:`, {
+      baseReturn: baseReturn.toFixed(4),
+      finalVolatility: finalVolatility.toFixed(4),
+      simulations: config.simulations,
+      finalValuesRange: {
+        min: Math.min(...finalValues).toLocaleString(),
+        max: Math.max(...finalValues).toLocaleString(),
+        avg: (
+          finalValues.reduce((a, b) => a + b, 0) / finalValues.length
+        ).toLocaleString(),
+      },
+      monthlyPathsSample: {
+        firstPath: monthlyPaths[0]?.slice(0, 5).map((v) => v.toLocaleString()),
+        lastPath: monthlyPaths[0]?.slice(-5).map((v) => v.toLocaleString()),
+      },
     });
 
     return {
@@ -365,7 +362,7 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
       success_rate: parseFloat(analysis.successRate.toFixed(1)),
       expected_value: Math.round(analysis.expectedValue), // 원단위는 정수로
       volatility: parseFloat((analysis.volatility * 100).toFixed(1)), // 퍼센트, 소수점 첫째자리
-      max_drawdown: parseFloat(analysis.maxDrawdown.toFixed(1)), // 퍼센트, 소수점 첫째자리
+      max_drawdown: parseFloat((analysis.maxDrawdown * 100).toFixed(1)), // 퍼센트, 소수점 첫째자리
       sharpe_ratio: parseFloat(analysis.sharpeRatio.toFixed(1)), // 소수점 첫째자리
       var_95: Math.round(analysis.var95), // 원단위는 정수로
       cvar_95: Math.round(analysis.cvar95), // 원단위는 정수로
@@ -380,7 +377,25 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
       ), // 퍼센트, 소수점 첫째자리
       market_regime: marketRegime,
       simulation_count: config.simulations,
-      monthly_paths: monthlyPaths.slice(0, 5),
+      // 새로운 월별 경로 데이터 구조
+      monthly_paths: {
+        representative: {
+          p95: representative.p95, // 최고 성과 경로
+          p50: representative.p50, // 중앙값 경로
+          p05: representative.p05, // 최악 성과 경로
+        },
+        random_samples: randomSamples, // 랜덤 샘플 2개
+        fan_bands: fanBands, // 분위수 밴드
+        principal_line: principalLine, // 원금 누적선
+        x_axis: {
+          type: "monthIndex",
+          length: targetYears * 12,
+          labels: Array.from(
+            { length: targetYears * 12 },
+            (_, i) => `${Math.floor(i / 12)}년 ${(i % 12) + 1}월`
+          ),
+        },
+      },
       confidence_interval: {
         low: parseFloat(low.toFixed(1)),
         mid: parseFloat(mid.toFixed(1)),
@@ -431,7 +446,9 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     config,
     garchParams = null
   ) {
-    const monthlyReturn = Math.pow(1 + baseReturn, 1 / 12) - 1;
+    // 월별 수익률 계산 수정: 연간 수익률을 월별로 변환
+    const monthlyReturn = baseReturn / 12; // 단순 월별 변환 (복리 효과는 매월 적용)
+
     // 변동성 올바른 환산: 연간 → 월간 변환
     const histMonthlyStd = volatility / Math.sqrt(12); // 연간 → 월간 변환 (√12 사용)
 
@@ -448,7 +465,14 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
       console.warn("GARCH 안정성 조건 위반: α + β >= 1");
     }
 
-    const portfolio = Array.from({ length: targetYears * 12 }, (_, month) => {
+    // 포트폴리오 초기화
+    let portfolioValue = initialAmount;
+    const monthlyValues = [initialAmount];
+    let peakValue = initialAmount;
+    let maxDrawdown = 0;
+
+    // 월별 시뮬레이션 실행
+    for (let month = 0; month < targetYears * 12; month++) {
       // GARCH(1,1) 모델: 동적 변동성 사용
       const rngNormalValue = rngNormal(rng);
       const shock = rngNormalValue * sigma; // εₜ
@@ -461,37 +485,29 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
       // GARCH 업데이트: σ²ₜ₊₁ = ω + αε²ₜ + βσ²ₜ (softCapped 사용)
       sigma = Math.sqrt(OMEGA + ALPHA * softCapped ** 2 + BETA * sigma ** 2);
 
-      // 3년 시뮬레이션에서 sigma 변동 확인 (디버깅용)
-      if (targetYears === 3 && month % 12 === 0) {
-        console.log(`GARCH σ 변동 (${month / 12}년차):`, sigma.toFixed(6));
-      }
+      // 포트폴리오 가치 업데이트 (복리 효과 적용)
+      portfolioValue =
+        portfolioValue * (1 + monthlyReturnWithShock) + monthlyContribution;
 
-      return { month, return: monthlyReturnWithShock, sigma };
-    }).reduce(
-      (portfolio, { return: monthlyReturn }) => {
-        portfolio.value *= 1 + monthlyReturn;
-        portfolio.value += monthlyContribution;
-        portfolio.monthlyValues.push(portfolio.value);
-        portfolio.peakValue = Math.max(portfolio.peakValue, portfolio.value);
-        portfolio.maxDrawdown = Math.max(
-          portfolio.maxDrawdown,
-          (portfolio.peakValue - portfolio.value) / portfolio.peakValue
-        );
-        return portfolio;
-      },
-      {
-        value: initialAmount,
-        monthlyValues: [initialAmount],
-        peakValue: initialAmount,
-        maxDrawdown: 0,
+      // 안전장치: 포트폴리오 가치가 음수가 되지 않도록
+      portfolioValue = Math.max(0, portfolioValue);
+
+      // 월별 값 저장
+      monthlyValues.push(portfolioValue);
+
+      // 최대낙폭 계산
+      peakValue = Math.max(peakValue, portfolioValue);
+      if (peakValue > 0) {
+        const currentDrawdown = (peakValue - portfolioValue) / peakValue;
+        maxDrawdown = Math.max(maxDrawdown, currentDrawdown);
       }
-    );
+    }
 
     // finalValue를 포함한 객체 반환
     return {
-      finalValue: portfolio.value,
-      monthlyValues: portfolio.monthlyValues,
-      maxDrawdown: portfolio.maxDrawdown,
+      finalValue: portfolioValue,
+      monthlyValues: monthlyValues,
+      maxDrawdown: maxDrawdown,
     };
   }
 
@@ -519,41 +535,18 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     });
     const volatility = std(annualizedReturns); // 이미 연간화된 수익률의 표준편차
 
-    // 변동성 디버깅 로그 추가
-    console.log("🔍 변동성 계산 디버깅:", {
-      initialInvestment,
-      targetYears,
-      sampleReturns: annualizedReturns
-        .slice(0, 5)
-        .map((r) => (r * 100).toFixed(2) + "%"),
-      volatility: (volatility * 100).toFixed(2) + "%",
-      volatilityRaw: volatility,
-    });
-
-    const { var: var95, cvar: cvar95 } = varCvar(
-      finalValues,
-      config.riskMetrics.varConfidence
-    );
-
-    // VaR/CVaR을 손실 지표로 수정 (포트폴리오 가치 → 손실액)
+    // 손실 기준 VaR/CVaR 계산
     const totalContribution =
       initialInvestment + monthlyContribution * targetYears * 12;
-    const var95Loss = totalContribution - var95; // 투입 원금 대비 손실 (올바른 방향)
-    const cvar95Loss = totalContribution - cvar95; // 투입 원금 대비 손실 (올바른 방향)
 
-    // VaR/CVaR 디버깅 로그 추가
-    console.log("🔍 VaR/CVaR 계산 디버깅:", {
-      initialInvestment,
-      monthlyContribution,
-      targetYears,
-      totalContribution,
-      var95Original: var95,
-      cvar95Original: cvar95,
-      var95Loss,
-      cvar95Loss,
-      var95Percent: ((var95Loss / totalContribution) * 100).toFixed(2) + "%",
-      cvar95Percent: ((cvar95Loss / totalContribution) * 100).toFixed(2) + "%",
-    });
+    // 1) 손실 배열 생성 (양수 = 손실, 음수 = 이익)
+    const losses = finalValues.map((v) => totalContribution - v);
+
+    // 2) 손실 기준 VaR/CVaR (항상 CVaR ≥ VaR 관계 유지)
+    const { var: var95Loss, cvar: cvar95Loss } = varCvar(
+      losses,
+      config.riskMetrics.varConfidence
+    );
 
     // 샤프비율 계산 수정: 연간화된 수익률과 변동성 사용
     const avgAnnualizedReturn = mean(annualizedReturns);
@@ -563,25 +556,11 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
       config.riskFreeRate
     );
 
-    // Sharpe 계산 디버깅 로그 추가
-    console.log("🔍 Sharpe 계산 디버깅:", {
-      avgAnnualizedReturn: (avgAnnualizedReturn * 100).toFixed(2) + "%",
-      volatility: (volatility * 100).toFixed(2) + "%",
-      riskFreeRate: (config.riskFreeRate * 100).toFixed(2) + "%",
-      sharpeRatio: sharpeRatioValue.toFixed(2),
-      excessReturn:
-        ((avgAnnualizedReturn - config.riskFreeRate) * 100).toFixed(2) + "%",
-    });
-
     // 최대낙폭 계산 수정: 데이터베이스 값 우선 사용
     let avgMaxDrawdown;
     if (finalMaxDrawdown && finalMaxDrawdown > 0) {
       // 데이터베이스 값 사용
       avgMaxDrawdown = finalMaxDrawdown;
-      console.log(
-        "🔍 최대낙폭: 데이터베이스 값 사용",
-        avgMaxDrawdown.toFixed(2) + "%"
-      );
     } else {
       // 계산된 값 사용 (기존 로직)
       const maxDrawdowns = monthlyPaths.map((path) => {
@@ -599,20 +578,6 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
         return maxDrawdown;
       });
       avgMaxDrawdown = mean(maxDrawdowns);
-
-      // 최대낙폭 디버깅 로그 추가
-      console.log("🔍 최대낙폭 계산 디버깅:", {
-        samplePaths: monthlyPaths.slice(0, 3).map((path) => ({
-          initialValue: path[0],
-          maxValue: Math.max(...path),
-          minValue: Math.min(...path),
-          pathLength: path.length,
-        })),
-        maxDrawdownsSample: maxDrawdowns
-          .slice(0, 5)
-          .map((dd) => (dd * 100).toFixed(2) + "%"),
-        avgMaxDrawdown: avgMaxDrawdown.toFixed(2) + "%",
-      });
     }
 
     // 리스크 조정 수익률 계산 수정: 샤프비율 * 성공률 (퍼센트 단위)
@@ -975,6 +940,67 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     };
 
     return params[assetClass] || params.mixed;
+  }
+
+  // Fan Bands 계산 함수
+  buildFanBands(monthlyPaths, quantiles = [0.05, 0.25, 0.5, 0.75, 0.95]) {
+    if (!monthlyPaths || monthlyPaths.length === 0) {
+      return {};
+    }
+
+    const months = monthlyPaths[0].length;
+    const bands = {};
+
+    quantiles.forEach(
+      (q) => (bands[`p${Math.round(q * 100)}`] = Array(months))
+    );
+
+    for (let t = 0; t < months; t++) {
+      const crossSection = monthlyPaths.map((p) => p[t]); // t시점 모든 경로의 값
+      quantiles.forEach((q) => {
+        bands[`p${Math.round(q * 100)}`][t] = percentile(crossSection, q);
+      });
+    }
+
+    return bands;
+  }
+
+  // 대표 경로 선택 (최고/중앙/최악 + 랜덤)
+  selectRepresentativePaths(monthlyPaths, finalValues) {
+    const pairs = finalValues.map((v, i) => ({ value: v, index: i }));
+    const sortedPairs = pairs.sort((a, b) => b.value - a.value);
+
+    const n = monthlyPaths.length;
+    const p95Index = Math.floor(n * 0.05); // 상위 5%
+    const p50Index = Math.floor(n * 0.5); // 중앙값
+    const p05Index = Math.floor(n * 0.95); // 하위 5%
+
+    const representative = {
+      p95: monthlyPaths[sortedPairs[p95Index].index], // 최고 성과
+      p50: monthlyPaths[sortedPairs[p50Index].index], // 중앙값
+      p05: monthlyPaths[sortedPairs[p05Index].index], // 최악 성과
+    };
+
+    // 랜덤 샘플 2개 선택
+    const randomIndices = [];
+    while (randomIndices.length < 2) {
+      const randomIndex = Math.floor(Math.random() * n);
+      if (!randomIndices.includes(randomIndex)) {
+        randomIndices.push(randomIndex);
+      }
+    }
+
+    const randomSamples = randomIndices.map((i) => monthlyPaths[i]);
+
+    return { representative, randomSamples };
+  }
+
+  // 원금 누적선 계산
+  calculatePrincipalLine(initialAmount, monthlyContribution, months) {
+    return Array.from(
+      { length: months },
+      (_, i) => initialAmount + monthlyContribution * i
+    );
   }
 }
 

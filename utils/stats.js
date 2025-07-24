@@ -98,7 +98,7 @@ function sharpeRatio(avg, stdev, rf = 0.02) {
  * @param {Array<number>} arr - 수익률 또는 포트폴리오 가치 배열
  * @param {number} alpha - 신뢰수준 (기본값: 0.95)
  *                        alpha=0.95 → VaR은 5% 백분위수
- * @returns {object} { var, cvar }
+ * @returns {object} { var: VaR 값, cvar: CVaR 값 }
  */
 function varCvar(arr, alpha = 0.95) {
   if (!Array.isArray(arr) || arr.length === 0) {
