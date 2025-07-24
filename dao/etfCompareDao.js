@@ -75,7 +75,7 @@ const getEtfOneDao = async (connection, etfCode, userId) => {
       p.aum AS latest_aum,
       ROUND(mdd.max_drawdown::numeric, 2) AS max_drawdown,
       ROUND(((rc.year1::numeric / NULLIF(v.daily_vol, 0)) * SQRT(252))::numeric, 2) AS sharpe_ratio,
-      ROUND(ers.volatility::numeric, 2) AS volatility,
+      ROUND(ers.volatility::numeric, 4) AS volatility,
       ROUND(ers.stability_risk_score::numeric, 2) AS raw_score,
       ROUND(
         (
