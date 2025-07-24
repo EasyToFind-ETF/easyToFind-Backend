@@ -11,8 +11,23 @@ const monteCarloConfig = {
   // === 기본 시뮬레이션 설정 ===
   simulations: 2000, // 기본 경로 수 (정확도 vs 성능 균형)
   riskFreeRate: 0.02, // 무위험 수익률 (연 2%)
-  maxMonthlyMove: 0.25, // 월별 수익률 클리핑 완화 (±25%)
+  maxMonthlyMove: 0.25, // 월별 수익률 소프트 캡 기준 (±25% 이상은 점차 포화)
   tailDf: 5, // t-분포 자유도 (fat-tail 현상 대응)
+
+  // === 기본 시스템 설정 ===
+  dataHorizonMonths: 60, // 데이터 수집 기간 (5년)
+  etfLimit: 900, // 시가총액 상위 ETF 수
+  maxYears: 5, // 최대 투자 기간
+  contributionTiming: "end", // 납입 시점 (start/end)
+
+  // === GARCH(1,1) 모델 설정 ===
+  garch: {
+    alpha: 0.12, // 충격의 영향력 (12%)
+    beta: 0.86, // 변동성 지속성 (86%)
+    omega: 1e-6, // 장기 평균 변동성
+    enableGARCH: true, // GARCH 모델 사용 여부
+    stabilityCheck: true, // 안정성 조건 검증 여부
+  },
 
   // === 난수 생성 설정 ===
   random: {
@@ -87,7 +102,7 @@ const monteCarloConfig = {
   // === 디버깅 및 로깅 설정 ===
   debugging: {
     enableLogs: false, // 디버깅 로그 활성화
-    logLevel: 'info', // 로그 레벨 (debug, info, warn, error)
+    logLevel: "info", // 로그 레벨 (debug, info, warn, error)
     saveIntermediateResults: false, // 중간 결과 저장
     detailedScenarios: 5, // 상세 로깅할 시나리오 수
   },
@@ -95,7 +110,7 @@ const monteCarloConfig = {
   // === 환경별 설정 오버라이드 ===
   environments: {
     development: {
-      simulations: 100, // 개발환경에서는 적은 시뮬레이션
+      simulations: 2000, // 모든 환경에서 2000개로 통일
       enableLogs: true,
       debugging: {
         enableLogs: true,
@@ -103,14 +118,14 @@ const monteCarloConfig = {
       },
     },
     testing: {
-      simulations: 500, // 테스트환경에서는 중간 시뮬레이션
+      simulations: 2000, // 모든 환경에서 2000개로 통일
       random: {
         defaultSeed: 42, // 테스트용 고정 시드
         enableSeededRng: true,
       },
     },
     production: {
-      simulations: 2000, // 프로덕션에서는 많은 시뮬레이션
+      simulations: 2000, // 모든 환경에서 2000개로 통일
       enableLogs: false,
       performance: {
         enableParallel: true,
@@ -124,7 +139,7 @@ const monteCarloConfig = {
  * @param {string} environment - 환경명 (development, testing, production)
  * @returns {object} 환경별 설정
  */
-function getConfig(environment = 'production') {
+function getConfig(environment = "production") {
   const baseConfig = { ...monteCarloConfig };
 
   // 환경별 설정이 있으면 오버라이드
@@ -133,7 +148,10 @@ function getConfig(environment = 'production') {
 
     // 깊은 병합 수행
     Object.keys(envConfig).forEach((key) => {
-      if (typeof envConfig[key] === 'object' && !Array.isArray(envConfig[key])) {
+      if (
+        typeof envConfig[key] === "object" &&
+        !Array.isArray(envConfig[key])
+      ) {
         baseConfig[key] = { ...baseConfig[key], ...envConfig[key] };
       } else {
         baseConfig[key] = envConfig[key];
@@ -150,13 +168,13 @@ function getConfig(environment = 'production') {
  * @param {string} environment - 환경명
  * @returns {any} 설정값
  */
-function getSetting(path, environment = 'production') {
+function getSetting(path, environment = "production") {
   const config = getConfig(environment);
-  const keys = path.split('.');
+  const keys = path.split(".");
 
   let value = config;
   for (const key of keys) {
-    if (value && typeof value === 'object' && key in value) {
+    if (value && typeof value === "object" && key in value) {
       value = value[key];
     } else {
       return undefined;
@@ -176,19 +194,19 @@ function validateConfig(config) {
 
   // 필수 설정 검사
   if (!config.simulations || config.simulations < 1) {
-    errors.push('simulations must be a positive number');
+    errors.push("simulations must be a positive number");
   }
 
   if (config.riskFreeRate < 0 || config.riskFreeRate > 1) {
-    errors.push('riskFreeRate must be between 0 and 1');
+    errors.push("riskFreeRate must be between 0 and 1");
   }
 
   if (config.maxMonthlyMove <= 0 || config.maxMonthlyMove > 1) {
-    errors.push('maxMonthlyMove must be between 0 and 1');
+    errors.push("maxMonthlyMove must be between 0 and 1");
   }
 
   if (config.tailDf <= 0) {
-    errors.push('tailDf must be positive');
+    errors.push("tailDf must be positive");
   }
 
   // 시장 상황별 설정 검사
@@ -210,14 +228,14 @@ function validateConfig(config) {
  * @param {string} environment - 환경명
  * @returns {object} 검증된 설정
  */
-function initializeConfig(environment = 'production') {
+function initializeConfig(environment = "production") {
   const config = getConfig(environment);
   const validation = validateConfig(config);
 
   if (!validation.isValid) {
-    console.warn('Monte Carlo 설정 검증 실패:', validation.errors);
+    console.warn("Monte Carlo 설정 검증 실패:", validation.errors);
     // 기본값으로 폴백
-    return getConfig('production');
+    return getConfig("production");
   }
 
   return config;
