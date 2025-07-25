@@ -2,12 +2,20 @@ const getEtfOneDao = async (connection, etfCode, userId) => {
   const sql = `
     WITH user_weights AS (
       SELECT 
-        stability_weight,
-        liquidity_weight,
-        growth_weight,
-        diversification_weight
-      FROM users
-      WHERE user_id = $2
+        stability_weight / total AS stability_weight,
+        liquidity_weight / total AS liquidity_weight,
+        growth_weight / total AS growth_weight,
+        diversification_weight / total AS diversification_weight
+      FROM (
+        SELECT 
+          stability_weight,
+          liquidity_weight,
+          growth_weight,
+          diversification_weight,
+          (stability_weight + liquidity_weight + growth_weight + diversification_weight) AS total
+        FROM users
+        WHERE user_id = $2
+      ) raw_weights
     ),
     user_input AS (
       SELECT ($3 / 30.0) * 100.0 AS user_score_100
