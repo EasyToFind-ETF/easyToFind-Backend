@@ -8,7 +8,7 @@ const getTestThemeResultDao = {
     theme
   ) => {
     const query = `
-          WITH raw_score AS (
+ WITH raw_score AS (
   SELECT
     ers.etf_code,
     e.etf_name,
@@ -37,9 +37,6 @@ SELECT *
 FROM raw_score
 ORDER BY total_score DESC
 LIMIT 5;
-
-
-
 `;
     console.log(
       "ddd",
