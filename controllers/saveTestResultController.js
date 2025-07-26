@@ -5,23 +5,24 @@ const { saveTRService } = require("../services/saveTestResultService");
 const saveTestResultController = {
   saveTestResultPage: async (req, res) => {
     const userId = req.user.user_id; // authMiddleware에서 넣어준 값
-    const {
-      mbtiType,
-      stabilityWeight,
-      liquidityWeight,
-      growthWeight,
-      divWeight,
-    } = req.body;
-    console.log("userId", userId);
+    const { mbtiType, stabilityScore, liquidityScore, growthScore, divScore } =
+      req.body;
+    console.log(
+      "savecontroller",
+      stabilityScore,
+      liquidityScore,
+      growthScore,
+      divScore
+    );
 
     try {
       const result = await saveTRService(
         userId,
         mbtiType,
-        stabilityWeight,
-        liquidityWeight,
-        growthWeight,
-        divWeight
+        stabilityScore,
+        liquidityScore,
+        growthScore,
+        divScore
       );
       //   console.log("User ID:", userId);
       //   console.log("MBTI Type:", mbtiType);

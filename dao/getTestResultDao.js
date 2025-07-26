@@ -7,7 +7,7 @@ const getTestResultDao = {
     divScore
   ) => {
     const query = `
-          WITH raw_score AS (
+ WITH raw_score AS (
   SELECT
     ers.etf_code,
     e.etf_name,
@@ -37,12 +37,13 @@ ORDER BY total_score DESC
 LIMIT 5;
 `;
     console.log(
-      "stabilityScore,liquidityScore,growthScore,divScore",
+      "testDao",
       stabilityScore,
       liquidityScore,
       growthScore,
       divScore
     );
+
     const result = await connection.query(query, [
       stabilityScore,
       liquidityScore,

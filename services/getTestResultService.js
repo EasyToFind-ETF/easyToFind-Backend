@@ -18,7 +18,13 @@ const getTestResultService = {
         growthScore,
         divScore
       );
-      console.log("service", result);
+      console.log(
+        "service",
+        stabilityScore,
+        liquidityScore,
+        growthScore,
+        divScore
+      );
       if (result.length === 0) {
         throw new Error("No test results found");
       }
