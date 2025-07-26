@@ -5,10 +5,10 @@ const saveTestResultService = {
   saveTRService: async (
     userId,
     mbtiType,
-    stabilityWeight,
-    liquidityWeight,
-    growthWeight,
-    divWeight
+    stabilityScore,
+    liquidityScore,
+    growthScore,
+    divScore
   ) => {
     const client = await pool.connect();
     try {
@@ -16,10 +16,10 @@ const saveTestResultService = {
         client,
         userId,
         mbtiType,
-        stabilityWeight,
-        liquidityWeight,
-        growthWeight,
-        divWeight
+        stabilityScore,
+        liquidityScore,
+        growthScore,
+        divScore
       );
       if (result.rowCount === 0) {
         throw new Error("Failed to save test result");
