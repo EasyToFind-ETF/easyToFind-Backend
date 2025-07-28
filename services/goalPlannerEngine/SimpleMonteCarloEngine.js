@@ -276,7 +276,7 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     });
 
     const dbVolatility = recommendationData?.volatility || 0.15; // 기본값 15%
-    const dbMaxDrawdown = recommendationData?.mdd || 0.3; // 기본값 30%
+    const dbMaxDrawdown = recommendationData?.mdd || 30; // 기본값 30% (DB에 퍼센트 단위로 저장됨)
 
     const { baseReturn, volatility, marketRegime } = this.calculateEtfMetrics(
       etf,
@@ -395,7 +395,7 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
       success_rate: parseFloat(analysis.successRate.toFixed(1)),
       expected_value: Math.round(analysis.expectedValue), // 원단위는 정수로
       volatility: parseFloat((analysis.volatility * 100).toFixed(1)), // 퍼센트, 소수점 첫째자리
-      max_drawdown: parseFloat((analysis.maxDrawdown * 100).toFixed(1)), // 퍼센트, 소수점 첫째자리
+      max_drawdown: parseFloat(analysis.maxDrawdown.toFixed(1)), // DB에서 이미 퍼센트 단위로 저장됨
       sharpe_ratio: parseFloat(analysis.sharpeRatio.toFixed(1)), // 소수점 첫째자리
       var_95: Math.round(analysis.var95), // 원단위는 정수로
       cvar_95: Math.round(analysis.cvar95), // 원단위는 정수로
@@ -612,10 +612,10 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
     // 최대낙폭 계산 수정: 데이터베이스 값 우선 사용
     let avgMaxDrawdown;
     if (finalMaxDrawdown && finalMaxDrawdown > 0) {
-      // 데이터베이스 값 사용
+      // 데이터베이스 값 사용 (이미 퍼센트 단위)
       avgMaxDrawdown = finalMaxDrawdown;
     } else {
-      // 계산된 값 사용 (기존 로직)
+      // 계산된 값 사용 (소수점을 퍼센트로 변환)
       const maxDrawdowns = monthlyPaths.map((path) => {
         let peak = Math.max(path[0], 1e-6); // 초기값 안전하게 설정
         let maxDrawdown = 0;
@@ -628,7 +628,7 @@ class SimpleMonteCarloEngine extends GoalSimEngine {
             maxDrawdown = drawdown;
           }
         }
-        return maxDrawdown;
+        return maxDrawdown * 100; // 소수점을 퍼센트로 변환
       });
       avgMaxDrawdown = mean(maxDrawdowns);
     }
