@@ -45,7 +45,7 @@ const getMainTrendDao = {
         SELECT MAX(trade_date)
         FROM new_prices_daily
       )
-      ORDER BY npd.fluc_rt1 DESC
+      ORDER BY erc.week1 DESC
       LIMIT 5;
     `;
     const result = await connection.query(query);
