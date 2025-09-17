@@ -73,7 +73,6 @@ Easy To Find는 투자 판단까지 걸리는 복잡한 고민의 시간을 줄�
 <br><br>
 
 ## 실행 화면
-       <img width="1889" height="1105" alt=
 | **목록** | **실행 화면** |
 |:-----------:|-----------|
 | 메인 화면 | <img width="400" height="300" alt="스크린샷 2025-07-29 오후 4 39 01" src="https://github.com/user-attachments/assets/e37d3d5c-480a-40c4-a2c9-0777e56cd8ec" /><img width="400" height="300" alt="스크린샷 2025-07-29 오후 4 39 24" src="https://github.com/user-attachments/assets/4efe5435-f671-447f-a602-8f9ea6fefdf5" /><br><img width="400" height="300" alt="스크린샷 2025-07-29 오후 4 39 27" src="https://github.com/user-attachments/assets/4377d295-f865-4724-badd-d21a4395d3d1" /> |
